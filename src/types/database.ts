@@ -32,6 +32,13 @@ export interface BookingDetails {
     notes?: string | null
   }
   add_ons?: string[]
+  /** Set when this person registered under one of the event's non-diver
+   *  options (a snorkeler, a boat passenger) instead of as a diver. The option
+   *  replaces the event's diver price and deposit with its own. `label` is
+   *  snapshotted from the catalog by create-registration (never trusted from
+   *  the request), so a later rename or deletion leaves the booking readable.
+   *  Absent means a diver. */
+  nondiver_option?: { id: string; label: string }
   /** Discount ids the diver ticked at registration. Sent by the form and
    *  consumed by create-registration, which turns each into a
    *  `booking_discounts` row and strips the key: a discount is worth nothing
@@ -199,6 +206,7 @@ export interface Database {
           p_addon_ids?:       string[]
           p_destination_ids?: string[]
           p_discount_ids?:    string[]
+          p_nondiver_option_ids?: string[]
         }
         Returns: undefined
       }
@@ -354,6 +362,7 @@ export interface Database {
           p_series_id?: string | null
           p_created_by?: string | null
           p_discount_ids?: string[]
+          p_nondiver_option_ids?: string[]
         }
         Returns: string[]
       }
@@ -1433,6 +1442,53 @@ export interface Database {
           sort_order?: number
         }
         Update: Partial<Database['public']['Tables']['discounts']['Insert']>
+        Relationships: []
+      }
+      // Non-diver options (20261021100000): a snorkeler or boat passenger
+      // registering at their own fee instead of the diver price.
+      nondiver_options: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          label: string
+          description: string | null
+          price: number
+          deposit_amount: number | null
+          active: boolean
+          sort_order: number
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          label: string
+          description?: string | null
+          price: number
+          deposit_amount?: number | null
+          active?: boolean
+          sort_order?: number
+        }
+        Update: Partial<Database['public']['Tables']['nondiver_options']['Insert']>
+        Relationships: []
+      }
+      // Which non-diver options one event puts on its register form.
+      event_nondiver_options: {
+        Row: {
+          id: string
+          created_at: string
+          created_by: string | null
+          event_id: string
+          option_id: string
+        }
+        Insert: {
+          id?: string
+          created_at?: string
+          created_by?: string | null
+          event_id: string
+          option_id: string
+        }
+        Update: Partial<Database['public']['Tables']['event_nondiver_options']['Insert']>
         Relationships: []
       }
       // Which discounts one event puts on its register form.
@@ -2914,6 +2970,8 @@ export type EventWaiver = Database['public']['Tables']['event_waivers']['Row']
 export type Discount = Database['public']['Tables']['discounts']['Row']
 export type DiscountInsert = Database['public']['Tables']['discounts']['Insert']
 export type EventDiscount = Database['public']['Tables']['event_discounts']['Row']
+export type NondiverOption = Database['public']['Tables']['nondiver_options']['Row']
+export type NondiverOptionInsert = Database['public']['Tables']['nondiver_options']['Insert']
 export type BookingDiscount = Database['public']['Tables']['booking_discounts']['Row']
 export type WaiverRow = Database['public']['Tables']['waivers']['Row']
 export type WaiverInsert = Database['public']['Tables']['waivers']['Insert']

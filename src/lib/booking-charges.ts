@@ -30,6 +30,9 @@ export interface ChargeLine {
 
 export interface BuildChargesInput {
   base: number
+  /** The non-diver option this person registered under, if any. Its name
+   *  labels the base line, so the breakdown says what the fee was for. */
+  nondiverLabel?: string | null
   /** Per-item gear lines; `amount` is the item's price already multiplied by
    *  the number of dive days. */
   gear?: Array<{ item: string; amount: number }>
@@ -49,7 +52,8 @@ export interface BuildChargesInput {
  * Base is always shown; every other line is dropped when it's zero/empty.
  */
 export function buildCharges(input: BuildChargesInput): ChargeLine[] {
-  const lines: ChargeLine[] = [{ kind: 'base', label: t.chargeLines.base, amount: input.base }]
+  const baseLabel = input.nondiverLabel ? t.chargeLines.nondiverBase(input.nondiverLabel) : t.chargeLines.base
+  const lines: ChargeLine[] = [{ kind: 'base', label: baseLabel, amount: input.base }]
   const daySuffix = input.gearDays && input.gearDays > 1 ? ` (x${input.gearDays} days)` : ''
   for (const g of input.gear ?? []) {
     if (g.amount > 0) lines.push({ kind: 'gear', label: `Gear: ${g.item}${daySuffix}`, amount: g.amount })

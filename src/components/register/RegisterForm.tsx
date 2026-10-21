@@ -11,6 +11,7 @@ import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, 
 import { needsShoeSize } from '../../lib/logistics'
 import { siteConfig } from '../../config/site'
 import { discountValueLabel, fetchDiscountsForEvent } from '../../lib/discounts'
+import { DIVER, fetchNondiverOptionsForEvent, participantPricing } from '../../lib/nondiver-options'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
@@ -42,7 +43,7 @@ import {
   clearRegistrationDraft,
   type RegistrationDraft,
 } from '../../lib/registration-draft'
-import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, Discount, EOAddon, EORoom, PaymentMethod as PaymentMethodRow, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, CancellationPolicy, Database, Discount, EOAddon, EORoom, NondiverOption, PaymentMethod as PaymentMethodRow, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -530,6 +531,14 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // undiscounted one until an admin approves the request.
   const [discounts, setDiscounts] = useState<Discount[]>([])
   const [discountIds, setDiscountIds] = useState<Set<string>>(new Set())
+  // The non-diver options this event offers (a snorkeler, a boat passenger),
+  // and what each person on this booking registers as. A person on an option
+  // pays its price and deposit in place of the diver figures; the rest of the
+  // form asks them exactly what it asks a diver.
+  const [nondiverOptions, setNondiverOptions] = useState<NondiverOption[]>([])
+  const [participant, setParticipant] = useState<string>(initialDetails?.nondiver_option?.id ?? DIVER)
+  const [additionalParticipants, setAdditionalParticipants] = useState<Record<string, string>>({})
+  const participantFor = (id: string): string => additionalParticipants[id] ?? DIVER
   const [cancelPolicy, setCancelPolicy] = useState<CancellationPolicy | null>(null)
   // Pre-checked when editing an existing booking that already carries an
   // ack timestamp — admins shouldn't have to re-tick to save unrelated edits.
@@ -632,7 +641,15 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   const [payDepositOnly, setPayDepositOnly] = useState<boolean>(initialDetails?.pay_deposit_only ?? false)
   const [notes, setNotes] = useState(existingBooking?.notes ?? '')
 
-  const hasDeposit = (event.deposit_amount ?? 0) > 0
+  // The fee and deposit each person owes before extras: the event's diver
+  // figures, or their non-diver option's.
+  const pricingFor = (choice: string) => participantPricing(choice, nondiverOptions, event)
+  const primaryPricing = pricingFor(participant)
+  // Whether anyone on this booking has a deposit to pay — what puts the
+  // "pay the deposit now" choice on screen. Each booking still applies its own
+  // person's deposit (or none) below.
+  const hasDeposit = [primaryPricing, ...additionalTargets.map(tg => pricingFor(participantFor(tg.id)))]
+    .some(p => p.depositAmount > 0)
   const fullPaymentDeadline = useMemo(() => computeEffectiveFullPaymentDeadline(event), [event])
 
   // Profile fields — pre-filled from the diver's profile (empty strings for
@@ -868,6 +885,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
       const offered = await fetchDiscountsForEvent(event.id).catch(() => [] as Discount[])
       if (!cancelled) setDiscounts(offered)
+      const nondivers = await fetchNondiverOptionsForEvent(event.id).catch(() => [] as NondiverOption[])
+      if (!cancelled) setNondiverOptions(nondivers)
       if (event.cancel_policy) {
         const { data } = await supabase
           .from('cancellation_policies' as never)
@@ -1007,7 +1026,6 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // the methods load, and 0 for a method that carries none.
   const selectedMethod = paymentMethods?.find(m => m.key === payment) ?? null
   const paymentSurcharge = surchargeRateFor(selectedMethod)
-  const base = event.price ?? 0
   // Transport pricing comes from the linked prices row. NULL or 0 means
   // it's bundled into the base price — the form hides the opt-in checkbox
   // and the cost calc skips the surcharge entirely.
@@ -1028,11 +1046,10 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // What we send is only what we show them: the DB recomputes the flag on insert
   // (20260724010000), so a stale or forged value can't hide a full run.
   const rideWaitlisted = needsTransport === true && !rideAllowed
-  const payingDepositOnly = hasDeposit && payDepositOnly
-  // Everything on this booking that costs the same whoever is diving: the event
-  // fee, the room, the add-ons, the ride and the nitrox course. Gear is the one
-  // line that turns on the individual diver, so it stays out of here.
-  const sharedCost = base + roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
+  // Everything on this booking that costs the same whoever it is for: the room,
+  // the add-ons, the ride and the nitrox course. The fee (diver or non-diver
+  // option) and the gear turn on the individual person, so they stay out.
+  const sharedCost = roomCost + addonsCost + transportCost + ((showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0)
 
   // Every money figure one booking resolves to, given what that diver rents.
   //
@@ -1040,22 +1057,33 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // *now*: the deposit when the diver pays deposit-only, otherwise the whole
   // subtotal. Charging 5% of the full amount when only the deposit is on the
   // card over-charges — the remainder is paid later, off the card.
-  function moneyFor(gearAmount: number) {
-    const subTotal = sharedCost + gearAmount
-    const depositFace = hasDeposit ? Math.min(event.deposit_amount ?? 0, subTotal) : 0
+  //
+  // Each person carries their own deposit: a non-diver option may have none,
+  // and that person then pays in full even when the rest of the group pays
+  // deposits — which is what create-registration bills them.
+  function moneyFor(gearAmount: number, pricing: ReturnType<typeof pricingFor>) {
+    const subTotal = pricing.base + sharedCost + gearAmount
+    const personHasDeposit = pricing.depositAmount > 0
+    const depositFace = personHasDeposit ? Math.min(pricing.depositAmount, subTotal) : 0
     const fullSurcharge    = Math.round(subTotal * paymentSurcharge)
     const depositSurcharge = Math.round(depositFace * paymentSurcharge)
+    const payingDeposit = personHasDeposit && payDepositOnly
+    const fullNow = subTotal + fullSurcharge
     return {
+      base: pricing.base,
+      hasDeposit: personHasDeposit,
+      payingDeposit,
       subTotal,
-      total: subTotal + (payingDepositOnly ? depositSurcharge : fullSurcharge),
+      total: subTotal + (payingDeposit ? depositSurcharge : fullSurcharge),
       // "How much to pay now" figures for each option:
-      fullNow:        subTotal + fullSurcharge,            // pay full now (surcharge on everything)
-      depositNow:     depositFace + depositSurcharge,      // pay deposit now (surcharge on the deposit only)
-      remainderLater: Math.max(0, subTotal - depositFace), // balance due later, no card surcharge
+      fullNow,                                                            // pay full now (surcharge on everything)
+      depositNow: personHasDeposit ? depositFace + depositSurcharge : fullNow, // pay deposit now (surcharge on the deposit only)
+      remainderLater: personHasDeposit ? Math.max(0, subTotal - depositFace) : 0, // balance due later, no card surcharge
     }
   }
 
-  const { subTotal, total, fullNow, depositNow, remainderLater } = moneyFor(gearCost)
+  const primaryMoney = moneyFor(gearCost, primaryPricing)
+  const { total, fullNow, depositNow, remainderLater } = primaryMoney
 
   // What each of the other divers costs, priced off their own gear answer. The
   // lead owes the sum of the bookings, not their own figure times a headcount —
@@ -1065,7 +1093,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     const cost = (showGearRentChoice && pick.choice === 'rent')
       ? pick.items.reduce((s, item) => s + (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays, 0)
       : 0
-    return { target: tg, pick, ...moneyFor(cost) }
+    const choice = participantFor(tg.id)
+    return { target: tg, pick, choice, ...moneyFor(cost, pricingFor(choice)) }
   })
 
   const groupCount       = 1 + additionalTargets.length
@@ -1113,13 +1142,26 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       ]
     : []
 
+  // The option a person registered under, as the booking records it. The label
+  // is for display only; create-registration re-reads it from the catalog.
+  function nondiverRef(choice: string): { id: string; label: string } | undefined {
+    if (choice === DIVER) return undefined
+    const option = nondiverOptions.find(o => o.id === choice)
+    return option ? { id: option.id, label: option.label } : undefined
+  }
+
   // Itemized breakdown of every charge that makes up `total`. Drives both the
   // on-screen summary and the snapshot written into details.charges, so what
   // the diver sees is exactly what gets frozen onto the booking.
-  function chargesFor(rentedItems: string[], money: { total: number; subTotal: number }) {
+  function chargesFor(
+    rentedItems: string[],
+    money: { base: number; total: number; subTotal: number; payingDeposit: boolean },
+    choice: string,
+  ) {
     const room = (showRooms && roomId) ? rooms.find(r => r.id === roomId) ?? null : null
     return buildCharges({
-      base,
+      base: money.base,
+      nondiverLabel: nondiverRef(choice)?.label ?? null,
       gear: rentedItems.map(item => ({ item, amount: (GEAR_ALACARTE_PRICES[item] ?? 0) * diveDays })),
       gearDays: diveDays,
       room: room ? { label: room.display_title ?? room.admin_title ?? 'Room', amount: roomCost } : null,
@@ -1133,7 +1175,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       nitroxCourse: (showNitroxAddon && addNitroxCourse) ? NITROX_COURSE_FEE : 0,
       surcharge: paymentSurcharge > 0 && selectedMethod
         ? {
-            label: t.chargeLines.surcharge(selectedMethod.label, Number(selectedMethod.surcharge_percent), payingDepositOnly),
+            label: t.chargeLines.surcharge(selectedMethod.label, Number(selectedMethod.surcharge_percent), money.payingDeposit),
             amount: money.total - money.subTotal,
           }
         : null,
@@ -1142,7 +1184,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
   const charges = chargesFor(
     (showGearRentChoice && gearChoice === 'rent') ? gearItems : [],
-    { total, subTotal },
+    primaryMoney,
+    participant,
   )
 
   function toggleItem(item: string) {
@@ -1251,6 +1294,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       gear: gearDetail(gearChoice, gearItems, gearHelpNote),
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
+      nondiver_option: nondiverRef(participant),
       discount_requests: [...discountIds],
       transportation: needsTransport === true,
       ride_waitlisted: rideWaitlisted,
@@ -1258,13 +1302,13 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       credit_card_invoice_email: selectedMethod?.collects_invoice_email && creditCardInvoiceEmail.trim()
         ? creditCardInvoiceEmail.trim()
         : undefined,
-      pay_deposit_only: hasDeposit ? payDepositOnly : false,
+      pay_deposit_only: primaryMoney.hasDeposit ? payDepositOnly : false,
       nitrox_course_addon: showNitroxAddon && addNitroxCourse,
       charges,
       total,
       // Surcharge-inclusive when paying by card/PayPal — the actual amount due
       // to secure the spot. Equals the face deposit for bank transfer / cash.
-      deposit: hasDeposit ? depositNow : undefined,
+      deposit: primaryMoney.hasDeposit ? depositNow : undefined,
       // Snapshot the credit the diver applied so the confirmation PDF can show
       // the gross total and the after-credit balance. The credit is actually
       // consumed by applyCreditToBooking after this booking is created.
@@ -1284,16 +1328,19 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         : initialDetails?.prereq_acked_at,
     }
 
-    // Each additional diver's booking differs from the lead's in exactly the
-    // gear they rent and the money that follows from it. Everything else —
-    // room, add-ons, ride, payment method, acknowledgments — is a property of
-    // the trip the lead booked, so it carries over unchanged.
+    // Each additional person's booking differs from the lead's in exactly the
+    // gear they rent, whether they dive or come on a non-diver option, and the
+    // money that follows from both. Everything else — room, add-ons, ride,
+    // payment method, acknowledgments — is a property of the trip the lead
+    // booked, so it carries over unchanged.
     const detailsForTarget = (m: typeof additionalMoney[number]): BookingDetails => ({
       ...details,
       gear: gearDetail(m.pick.choice, m.pick.items, m.pick.helpNote),
-      charges: chargesFor((showGearRentChoice && m.pick.choice === 'rent') ? m.pick.items : [], m),
+      nondiver_option: nondiverRef(m.choice),
+      charges: chargesFor((showGearRentChoice && m.pick.choice === 'rent') ? m.pick.items : [], m, m.choice),
       total: m.total,
-      deposit: hasDeposit ? m.depositNow : undefined,
+      pay_deposit_only: m.hasDeposit ? payDepositOnly : false,
+      deposit: m.hasDeposit ? m.depositNow : undefined,
     })
 
     if (existingBooking) {
@@ -1644,6 +1691,32 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         <section className="space-y-3">
           {event.price != null && (
             <p className="text-sm text-brand-950 font-medium">{t.register.fromPrice(event.currency, event.price.toLocaleString())}</p>
+          )}
+          {nondiverOptions.length > 0 && (
+            <div className="space-y-3">
+              <p className="text-xs text-brand-950 font-medium">{t.register.participant.blurb}</p>
+              <ParticipantChoice
+                name="participant-primary"
+                heading={additionalTargets.length > 0 && personName(fullName)
+                  ? t.register.participant.forPerson(personName(fullName))
+                  : t.register.participant.heading}
+                value={participant}
+                onChange={setParticipant}
+                options={nondiverOptions}
+                event={event}
+              />
+              {additionalTargets.map(tg => (
+                <ParticipantChoice
+                  key={tg.id}
+                  name={`participant-${tg.id}`}
+                  heading={t.register.participant.forPerson(personName(tg.name) || t.register.results.diverFallback)}
+                  value={participantFor(tg.id)}
+                  onChange={choice => setAdditionalParticipants(prev => ({ ...prev, [tg.id]: choice }))}
+                  options={nondiverOptions}
+                  event={event}
+                />
+              ))}
+            </div>
           )}
           {pastBlocked && (
             <div role="alert" className="bg-red-50 border border-accent rounded-lg px-3 py-2 text-xs text-red-700">
@@ -2599,3 +2672,42 @@ function PaymentInstructionLine({ line }: { line: string }) {
 // rather than by wrapping: a date field renders a second, transparent native
 // input for the OS picker, and a wrapping label would claim that one too —
 // ambiguous for screen readers and for tests querying by label.
+
+// "Registering as" for one person: the diver price, or one of the event's
+// non-diver options at its own price. Radios rather than a select so every
+// price is visible before anyone picks.
+function ParticipantChoice({ name, heading, value, onChange, options, event }: {
+  name: string
+  heading: string
+  value: string
+  onChange: (choice: string) => void
+  options: NondiverOption[]
+  event: Pick<AppEvent, 'price' | 'deposit_amount' | 'currency'>
+}) {
+  const p = t.register.participant
+  const money = (n: number) => p.price(event.currency, n.toLocaleString())
+  const rows: Array<{ id: string; label: string; price: number | null; deposit: number | null; description: string | null }> = [
+    { id: DIVER, label: p.diver, price: event.price ?? null, deposit: event.deposit_amount ?? null, description: null },
+    ...options.map(o => ({ id: o.id, label: o.label, price: o.price, deposit: o.deposit_amount, description: o.description })),
+  ]
+  return (
+    <fieldset className="space-y-1">
+      <legend className="text-sm font-semibold text-brand-900">{heading}</legend>
+      {rows.map(r => (
+        <label key={r.id} className="flex items-start gap-2 text-sm text-brand-950 font-medium">
+          <input type="radio" name={name} checked={value === r.id} onChange={() => onChange(r.id)} className="accent-brand-900 mt-1" />
+          <span className="flex-1 min-w-0">
+            <span className="block">
+              {r.label}
+              {r.price != null && <span className="ml-2 tabular-nums">{money(r.price)}</span>}
+            </span>
+            {r.deposit != null && r.deposit > 0 && (
+              <span className="block text-xs text-brand-950/70 tabular-nums">{p.deposit(event.currency, r.deposit.toLocaleString())}</span>
+            )}
+            {r.description && <span className="block text-xs text-brand-950/70 break-words">{r.description}</span>}
+          </span>
+        </label>
+      ))}
+    </fieldset>
+  )
+}

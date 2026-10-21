@@ -1803,6 +1803,11 @@ function AmendmentsSection({ readOnly, onAdd }: {
 
 function renderDetails(d: BookingDetails, names: { addonNames: AddonNameMap; roomNames: RoomNameMap }) {
   const bits: React.ReactNode[] = []
+  // First, because it changes how to read everything below it: this person
+  // came on the trip without diving, at the option's own price.
+  if (d.nondiver_option) {
+    bits.push(<p key="nondiver">🙋 {ed.detailNondiver(d.nondiver_option.label)}</p>)
+  }
   if (d.gear?.assistance_note) {
     bits.push(<p key="gear">🧰 {ed.detailGearHelp(d.gear.assistance_note)}</p>)
   } else if (d.gear?.rent) {

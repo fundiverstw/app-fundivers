@@ -498,6 +498,32 @@ describe('AdminNewEventPage', () => {
     expect(payload).not.toHaveProperty('destination_reference')
   })
 
+  it('sends the ticked non-diver options to the create RPC', async () => {
+    from.mockImplementation((table: string) => {
+      if (table === 'nondiver_options') return mockQueryBuilder({ data: [
+        { id: 'nd1', label: 'Snorkeler',      price: 1500, deposit_amount: 500,  active: true, sort_order: 0 },
+        { id: 'nd2', label: 'Boat passenger', price: 800,  deposit_amount: null, active: true, sort_order: 1 },
+      ] })
+      return mockQueryBuilder({ data: [] })
+    })
+    const user = userEvent.setup()
+    renderPage()
+    await screen.findByLabelText(/admin title \(required, internal\)/i)
+    await user.type(screen.getByLabelText(/admin title \(required, internal\)/i), 'Snorkel-friendly trip')
+    await user.type(getDateInputByLabel(/start date/i),  '2026-06-01')
+
+    // Each option shows its price, and its deposit where it has one.
+    const snorkeler = await screen.findByLabelText(/Snorkeler — .*1,500 \(deposit .*500\)/)
+    expect(screen.getByLabelText(/Boat passenger — .*800$/)).toBeInTheDocument()
+    await user.click(snorkeler)
+
+    await user.click(screen.getByRole('button', { name: /create dive/i }))
+
+    await waitFor(() => expect(rpc).toHaveBeenCalledWith('create_events_with_relations', expect.anything()))
+    const args = (rpc.mock.calls.find(c => c[0] === 'create_events_with_relations')?.[1] ?? {}) as Record<string, unknown>
+    expect(args.p_nondiver_option_ids).toEqual(['nd1'])
+  })
+
   it('creates a dive in one transaction and navigates to its detail page', async () => {
     from.mockImplementation(() => mockQueryBuilder({ data: [] }))
     const user = userEvent.setup()

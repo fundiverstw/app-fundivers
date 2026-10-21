@@ -99,7 +99,9 @@ Clicking an event in the calendar opens `RegisterForm`
 (`src/components/register/RegisterForm.tsx`) — a four-step modal:
 
 1. **Event info** — confirm title, dates, base price. Disabled if the
-   event is `fully_booked`.
+   event is `fully_booked`. On an event that offers non-diver options,
+   each person on the booking also picks what they register as (see
+   [§ Non-diver options](#non-diver-options)).
 2. **About you** — name, date of birth, nationality, gender, height,
    weight, contact, certification. Every one of them optional (see
    below).
@@ -176,10 +178,46 @@ diver's profile — `profile_patch` is otherwise empty for a fanned-out
 booking — and it is only asked for when that profile hasn't got one, so
 it fills a blank rather than overwriting a value.
 
+### Non-diver options
+
+Someone who comes on a trip without diving — a partner who snorkels, a
+friend who rides the boat — registers at their own fee. The shop names
+those ways in once at **Manage → Non-diver options**
+(`/admin/nondiver-options`, `nondiver_options`): a label, a description, a
+price and an optional deposit. The event form's **Non-diver options**
+section ticks which of them an event offers (`event_nondiver_options`,
+written with the event's other relations by `set_event_relations` /
+`create_events_with_relations`).
+
+On an event that offers at least one, step 1 asks each person "Registering
+as": **Diver** at the event's price, or one of the options at its own.
+Each person on a family booking chooses separately, so a parent can dive
+while a child snorkels. The choice replaces two figures and nothing else:
+
+- the **base** — the option's `price` instead of the event's diver price;
+- the **deposit** — the option's `deposit_amount`, or none when it has
+  none. That person then pays in full even when the rest of the group pays
+  deposits.
+
+The rest of the form is unchanged: a non-diver is asked about gear, room,
+add-ons and the ride exactly as a diver is, and billed for what they pick.
+
+The booking records the choice as `details.nondiver_option = { id, label }`
+and the base charge line reads "Non-diver: <label>". `create-registration`
+checks the option is offered on that event and still active — refusing the
+booking (422) otherwise, rather than quietly pricing the person as a diver —
+and takes the price, deposit and label from the catalog, never from the
+request. The admin event page shows the option on the person's card.
+
+The multi-event form (`MultiRegisterForm`) does not offer the choice, for
+the same reason it skips rooms and add-ons; a non-diver books that event on
+its own.
+
 ### Price composition
 
 ```
-total = base_price
+total = base_price      (the event's diver price, or the person's
+                         non-diver option price)
       + gear_cost       (0 when events.gear_included; otherwise
                          à-la-carte only: ∑ per-item × days for the
                          chosen items)

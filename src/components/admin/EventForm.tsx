@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { errorMessage } from '../../lib/errors'
 import { fetchEventRelations } from '../../lib/event-relations'
 import { siteConfig } from '../../config/site'
-import type { CancellationPolicy, CertLevel, Discount, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, TravelDestination } from '../../types/database'
+import type { CancellationPolicy, CertLevel, Discount, DiveSite, SiteKind, TripTemplateEntry, EOAddon, EventRow, EOPrice, EORoom, NondiverOption, TravelDestination } from '../../types/database'
 import { AddPlaceForm } from '../sites/AddPlaceForm'
 import {
   EMPTY_FORM,
@@ -38,6 +38,7 @@ type PreloadRow = Pick<EventRow, 'id' | 'kind' | 'admin_title' | 'display_title'
 const ef = t.admin.eventForm
 const cat = t.admin.catalog
 const ed = t.admin.eventDiscounts
+const en = t.admin.eventNondiverOptions
 const cxl = t.admin.cxlPolicies
 
 const CUR = siteConfig.locale.currency
@@ -107,6 +108,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
   const [rooms, setRooms] = useState<EORoom[]>([])
   const [addons, setAddons] = useState<EOAddon[]>([])
   const [discounts, setDiscounts] = useState<Discount[]>([])
+  const [nondiverOptions, setNondiverOptions] = useState<NondiverOption[]>([])
   const [certLevels, setCertLevels] = useState<CertLevel[]>([])
   const [cancelPolicies, setCancelPolicies] = useState<CancellationPolicy[]>([])
   const [tripTemplates, setTripTemplates] = useState<TripTemplateEntry[]>([])
@@ -186,6 +188,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         supabase.from('travel_destinations').select('*').order('sort_order', { nullsFirst: false }),
         supabase.from('dive_sites').select('*').eq('active', true).order('name'),
         supabase.from('discounts').select('*').eq('active', true).order('sort_order').order('label'),
+        supabase.from('nondiver_options').select('*').eq('active', true).order('sort_order').order('label'),
       ])
       if (cancelled) return
       const dataOf = <T,>(i: number): T[] => {
@@ -203,6 +206,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       setDestinations(dataOf<TravelDestination>(8))
       setDiveSites(dataOf<DiveSite>(9))
       setDiscounts(dataOf<Discount>(10))
+      setNondiverOptions(dataOf<NondiverOption>(11))
 
       // Both lists collapse to the newest event per admin_title — the site for
       // a dive or adventure, the course type for a course. The shop returns to
@@ -323,7 +327,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
     setAddingSite(false)
   }
 
-  function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds' | 'discountIds', id: string) {
+  function toggleId(key: 'addonIds' | 'roomIds' | 'destinationIds' | 'discountIds' | 'nondiverOptionIds', id: string) {
     setForm(f => {
       const list = f[key]
       const next = list.includes(id) ? list.filter(x => x !== id) : [...list, id]
@@ -1081,6 +1085,26 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
         <Field label={ef.fullPaymentDeadline}>
           <Input type="date" value={form.full_payment_deadline} onChange={v => set('full_payment_deadline', v)} />
         </Field>
+      </Section>
+
+      <Section title={en.heading}>
+        <p className="text-xs text-white/70">{en.blurb}</p>
+        {nondiverOptions.length === 0 ? (
+          <p className="text-sm text-brand-950 font-medium">{en.none}</p>
+        ) : (
+          <div className="space-y-1 max-h-56 overflow-y-auto bg-white/70 backdrop-blur-md border border-surface-200 rounded-md p-2">
+            {nondiverOptions.map(o => (
+              <Checkbox
+                key={o.id}
+                checked={form.nondiverOptionIds.includes(o.id)}
+                onChange={() => toggleId('nondiverOptionIds', o.id)}
+                label={en.optionLabel(o.label, `${CUR} ${o.price.toLocaleString()}`,
+                  o.deposit_amount ? `${CUR} ${o.deposit_amount.toLocaleString()}` : null)}
+              />
+            ))}
+          </div>
+        )}
+        <Link to="/admin/nondiver-options" className={`self-start ${BTN_XS_GHOST}`}>{en.manageLink}</Link>
       </Section>
 
       <Section title={ed.heading}>

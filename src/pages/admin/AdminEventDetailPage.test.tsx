@@ -128,6 +128,29 @@ describe('AdminEventDetailPage', () => {
     expect(screen.getByText(/JP 26/)).toBeInTheDocument()
   })
 
+  it('says on the expanded card when someone registered as a non-diver', async () => {
+    fetchEventsForBookings.mockResolvedValue(new Map([
+      ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],
+    ]))
+    const bookings = [{
+      id: 'b1', user_id: 'u1', status: 'confirmed', created_at: '2026-04-20',
+      event_id: 'dive_x', notes: null, refund_requested_at: null,
+      details: { gear: { rent: false }, nondiver_option: { id: 'nd1', label: 'Snorkeler' } },
+    }]
+    const profiles = [{ id: 'u1', name: 'Ada Lovelace', contact_method: null, contact_id: null }]
+    from.mockImplementation((table: string) => {
+      if (table === 'bookings') return mockQueryBuilder({ data: bookings })
+      if (table === 'profiles') return mockQueryBuilder({ data: profiles })
+      return mockQueryBuilder({ data: [] })
+    })
+
+    const user = userEvent.setup()
+    renderAt('/admin/events/dive_x')
+    await screen.findByText('Ada Lovelace')
+    await user.click(screen.getByRole('button', { expanded: false, name: /Ada Lovelace/ }))
+    expect(await screen.findByText(/Non-diver: Snorkeler/)).toBeInTheDocument()
+  })
+
   it('gives the diver row one real disclosure button, leaving the name selectable for copy/paste', async () => {
     fetchEventsForBookings.mockResolvedValue(new Map([
       ['dive_x', { id: 'dive_x', type: 'dive', title: 'Kenting', start_time: new Date().toISOString(), end_time: null, currency: 'TWD' }],

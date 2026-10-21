@@ -34,6 +34,7 @@ Write/manage routes — gated by `AdminRoute` (admin only):
 | `/admin/travel`                         | `AdminTravelPage`       | Manage `trip_templates` rows |
 | `/admin/destinations`                   | `AdminDestinationsPage` | Manage `travel_destinations` rows |
 | `/admin/prices`                         | `AdminPricesPage`       | Manage `prices` rows |
+| `/admin/nondiver-options`               | `AdminNondiverOptionsPage` | The shop's non-diver options (snorkeler, boat passenger…), each with its own price and optional deposit. Events offer them from the event form — see [events-and-bookings.md § Non-diver options](./events-and-bookings.md#non-diver-options) |
 | `/admin/discounts`                      | `AdminDiscountsPage`    | Two halves of one subject: the requests waiting on a decision, and the shop's discount catalog. Approving is the only thing that takes money off a booking — see [payments.md § Discounts](./payments.md#discounts) |
 | `/admin/payment-methods`                | `AdminPaymentMethodsPage` | How divers can pay: the method list, each one's bank account / payment link / surcharge — see [payments.md § Payment methods](./payments.md#payment-methods) |
 | `/admin/contact`                        | `AdminContactPage` | How divers reach the shop: the company email / phone / address / map link, and the ordered list of Contact-tab buttons (LINE, WhatsApp, Telegram, a phone number, …). Replaces what used to be `siteConfig.contact` |
@@ -139,6 +140,12 @@ the booking: somebody who takes the morning EFR class and dives in the
 afternoon is one diver, because any in-water booking wins. Each dry event
 also carries a "Dry — nobody in the water" badge on its banner and counts
 non-divers rather than divers there.
+
+The split is still per event, not per booking: somebody who registered on a
+diving event under a non-diver option (see
+[events-and-bookings.md § Non-diver options](./events-and-bookings.md#non-diver-options))
+is counted with that event's divers here. Their option shows on their card
+on the event page.
 
 ## Transport: runs, seats, riders
 

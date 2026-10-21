@@ -105,6 +105,7 @@ export async function createEvents(args: CreateEventsArgs): Promise<CreateEvents
     p_addon_ids: form.addonIds,
     p_destination_ids: form.destinationIds,
     p_discount_ids: form.discountIds,
+    p_nondiver_option_ids: form.nondiverOptionIds,
     p_vehicle_ids: vehicleIds,
     p_series: rule
       ? {
@@ -209,6 +210,7 @@ export async function extendSeries(
     p_addon_ids: template.addonIds,
     p_destination_ids: template.destinationIds,
     p_discount_ids: template.discountIds,
+    p_nondiver_option_ids: template.nondiverOptionIds,
     p_series_id: seriesId,
   })
   if (error) throw error

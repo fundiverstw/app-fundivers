@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { ShopContactContext } from '../../hooks/shop-contact-context'
@@ -12,7 +12,7 @@ import {
 import { GEAR_ITEMS, FULL_GEAR_SET, GEAR_ALACARTE_PRICES } from '../../lib/gear'
 import { CAPTCHA_REUSE_MAX_AGE_MS } from '../../lib/turnstile'
 import { t } from '../../i18n'
-import type { AppEvent, EOAddon, EORoom, Profile } from '../../types/database'
+import type { AppEvent, BookingDetails, EOAddon, EORoom, Profile } from '../../types/database'
 
 const RUBBER_BOOTS = 'Boots (rubber sole)'
 const FELT_BOOTS   = 'Boots (felt sole)'
@@ -2098,6 +2098,63 @@ describe('RegisterForm', () => {
       expect(onBooked).toHaveBeenCalled()
     })
 
+    it('prices each person on their own diver or non-diver choice, deposit included', async () => {
+      const snorkeler = {
+        id: 'nd1', created_at: '', created_by: null, label: 'Snorkeler', description: null,
+        price: 1500, deposit_amount: null, active: true, sort_order: 0,
+      }
+      from.mockImplementation((table: string) => {
+        if (table === 'payment_methods')        return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+        if (table === 'rooms')                  return mockQueryBuilder({ data: sampleRooms })
+        if (table === 'addons')                 return mockQueryBuilder({ data: sampleAddons })
+        if (table === 'profiles')               return mockQueryBuilder({ data: [childProfile] })
+        if (table === 'event_nondiver_options') return mockQueryBuilder({ data: [{ option_id: 'nd1' }] })
+        if (table === 'nondiver_options')       return mockQueryBuilder({ data: [snorkeler] })
+        return mockQueryBuilder()
+      })
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await waitFor(() => expect(screen.getByText(/who is this booking for/i)).toBeInTheDocument())
+      await user.click(screen.getByRole('checkbox', { name: /bee junior/i }))
+      await user.click(screen.getByRole('button', { name: /continue/i }))
+
+      // The parent dives; the child comes along snorkelling.
+      const childChoice = await screen.findByRole('group', { name: /bee junior is registering as/i })
+      await user.click(within(childChoice).getByLabelText(/snorkeler/i))
+
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      // Non-divers are asked the gear question like anyone else; this one rents nothing.
+      await user.click(screen.getByLabelText(t.register.gear.optNoneOther))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('radio', { name: n => n.startsWith(t.register.payment.payDepositOnly) }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+
+      await waitFor(() => expect(invoke).toHaveBeenCalledTimes(3))
+      const bodies = invoke.mock.calls
+        .filter(c => c[0] === 'create-registration')
+        .map(c => (c[1] as { body: Record<string, unknown> }).body)
+      const self  = bodies.find(b => !b.target_user_id)!.details as BookingDetails
+      const child = bodies.find(b => b.target_user_id === 'child-1')!.details as BookingDetails
+
+      expect(self.nondiver_option).toBeUndefined()
+      expect(self.total).toBe(2800)
+      expect(self.pay_deposit_only).toBe(true)
+      expect(self.deposit).toBe(1000)
+
+      // The snorkeler option has no deposit, so the child pays in full even
+      // though the parent chose deposits.
+      expect(child.nondiver_option).toEqual({ id: 'nd1', label: 'Snorkeler' })
+      expect(child.total).toBe(1500)
+      expect(child.pay_deposit_only).toBe(false)
+      expect(child.deposit).toBeUndefined()
+    })
+
     it('shows the cumulative group total when the lead pays for everyone', async () => {
       // Both divers own a full kit, so both bookings cost the same and the
       // summary can honestly call the lead's figure a per-diver price.
@@ -2476,6 +2533,83 @@ describe('RegisterForm', () => {
       expect(screen.queryByText(/with a valid student card/i)).not.toBeInTheDocument()
     })
   })
+  describe('non-diver options', () => {
+    const SNORKELER = {
+      id: 'nd1', created_at: '', created_by: null,
+      label: 'Snorkeler', description: 'Snorkel while the group dives',
+      price: 1500, deposit_amount: null, active: true, sort_order: 0,
+    }
+
+    function setupWithOption() {
+      from.mockImplementation((table: string) => {
+        if (table === 'payment_methods')        return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+        if (table === 'rooms')                  return mockQueryBuilder({ data: sampleRooms })
+        if (table === 'addons')                 return mockQueryBuilder({ data: sampleAddons })
+        if (table === 'event_nondiver_options') return mockQueryBuilder({ data: [{ option_id: 'nd1' }] })
+        if (table === 'nondiver_options')       return mockQueryBuilder({ data: [SNORKELER] })
+        return mockQueryBuilder()
+      })
+    }
+
+    async function submitAs(user: ReturnType<typeof userEvent.setup>, choice: RegExp | null) {
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      if (choice) await user.click(await screen.findByLabelText(choice))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByLabelText(/i have all the required gear/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+      const opts = invoke.mock.calls[0][1] as { body: Record<string, unknown> }
+      return opts.body.details as BookingDetails
+    }
+
+    it('lets the person register on an option, billed at its price with its name on the charge', async () => {
+      setupWithOption()
+      const user = userEvent.setup()
+      const details = await submitAs(user, /snorkeler/i)
+      expect(details.nondiver_option).toEqual({ id: 'nd1', label: 'Snorkeler' })
+      expect(details.total).toBe(1500)
+      expect(details.charges?.[0]).toEqual({ kind: 'base', label: 'Non-diver: Snorkeler', amount: 1500 })
+      // The option carries no deposit, so the booking has none either.
+      expect(details.deposit).toBeUndefined()
+      expect(details.pay_deposit_only).toBe(false)
+    })
+
+    it('starts on the diver choice, with every price on show', async () => {
+      setupWithOption()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      expect(await screen.findByLabelText(/^diver/i)).toBeChecked()
+      expect(screen.getByLabelText(/snorkeler/i)).not.toBeChecked()
+      expect(screen.getByText('TWD 1,500')).toBeInTheDocument()
+    })
+
+    it('registers a diver at the diver price when nobody picks an option', async () => {
+      setupWithOption()
+      const user = userEvent.setup()
+      const details = await submitAs(user, null)
+      expect(details.nondiver_option).toBeUndefined()
+      expect(details.total).toBe(2800)
+    })
+
+    it('puts no choice on an event that offers no options', async () => {
+      setupFrom()
+      render(
+        <RegisterForm event={sampleEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await screen.findByText(/step 1 of 4/i)
+      expect(screen.queryByText(/registering as/i)).not.toBeInTheDocument()
+    })
+  })
+
   // The bug these pin: a guest solved the challenge on step 2 and the token
   // was posted from step 4, minutes later. Cloudflare gives a token 300
   // seconds and one verification, so two divers who filled the form in at a

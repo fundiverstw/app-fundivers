@@ -71,6 +71,10 @@ interface MockOpts {
    *  surcharge is read from here, never from the request. */
   paymentMethodSurcharge?: number
   paymentMethodMissing?: boolean
+  /** The event offers the posted non-diver option (event_nondiver_options). */
+  nondiverLinked?: boolean
+  /** The nondiver_options row the posted id resolves to. */
+  nondiverOption?: { id: string; label: string; price: number; deposit_amount: number | null; active: boolean } | null
 }
 
 function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites } {
@@ -119,6 +123,10 @@ function makeDeps(opts: MockOpts = {}): { deps: Deps; captured: CapturedWrites }
             deposit_amount: opts.priceDeposit ?? 0,
             transport: opts.priceTransport ?? 0,
           }
+        case 'event_nondiver_options':
+          return opts.nondiverLinked ? { option_id: opts.nondiverOption?.id ?? 'nd1' } : null
+        case 'nondiver_options':
+          return opts.nondiverOption ?? null
         case 'payment_methods':
           return opts.paymentMethodMissing ? null : {
             key: 'credit_card', label: 'Credit card',
@@ -835,6 +843,75 @@ describe('handleRegistration — email behavior', () => {
     }), deps)
     expect(captured.bookingInsert).toHaveLength(1)
     expect((captured.bookingInsert[0].details as { total: number }).total).toBe(3200)
+  })
+
+  describe('non-diver options', () => {
+    const snorkeler = { id: 'nd1', label: 'Snorkeler', price: 1500, deposit_amount: 500, active: true }
+    const register = (deps: Deps, details: Record<string, unknown>) =>
+      handleRegistration(postJson({
+        ...goodBody,
+        email:    'g@example.com',
+        password: 'hunter2hunter2',
+        turnstile_token: 'tk',
+        details,
+      }), deps)
+
+    it('bills the option price and deposit instead of the diver figures, with the catalog label', async () => {
+      const { deps, captured } = makeDeps({
+        eventPriceId: 'p1', priceStartingAt: 3200, priceDeposit: 1000,
+        nondiverLinked: true, nondiverOption: snorkeler,
+      })
+      await register(deps, {
+        nondiver_option: { id: 'nd1', label: 'Free ride' },
+        pay_deposit_only: true,
+        total: 0, deposit: 0,
+      })
+      const details = captured.bookingInsert[0].details as {
+        nondiver_option: unknown; total: number; deposit: number
+      }
+      expect(details.nondiver_option).toEqual({ id: 'nd1', label: 'Snorkeler' })
+      expect(details.total).toBe(1500)
+      expect(details.deposit).toBe(500)
+    })
+
+    it('leaves no deposit when the option carries none', async () => {
+      const { deps, captured } = makeDeps({
+        eventPriceId: 'p1', priceStartingAt: 3200, priceDeposit: 1000,
+        nondiverLinked: true, nondiverOption: { ...snorkeler, deposit_amount: null },
+      })
+      await register(deps, { nondiver_option: { id: 'nd1' }, pay_deposit_only: true })
+      const details = captured.bookingInsert[0].details as { total: number; deposit: number | null }
+      expect(details.total).toBe(1500)
+      expect(details.deposit).toBeNull()
+    })
+
+    it('refuses an option the event does not offer, and writes no booking', async () => {
+      const { deps, captured } = makeDeps({
+        eventPriceId: 'p1', priceStartingAt: 3200,
+        nondiverLinked: false, nondiverOption: snorkeler,
+      })
+      const res = await register(deps, { nondiver_option: { id: 'nd1' } })
+      expect(res.status).toBe(422)
+      expect(captured.bookingInsert).toHaveLength(0)
+    })
+
+    it('refuses an option the shop has retired', async () => {
+      const { deps, captured } = makeDeps({
+        eventPriceId: 'p1', priceStartingAt: 3200,
+        nondiverLinked: true, nondiverOption: { ...snorkeler, active: false },
+      })
+      const res = await register(deps, { nondiver_option: { id: 'nd1' } })
+      expect(res.status).toBe(422)
+      expect(captured.bookingInsert).toHaveLength(0)
+    })
+
+    it('prices a booking without an option as a diver and stores no option', async () => {
+      const { deps, captured } = makeDeps({ eventPriceId: 'p1', priceStartingAt: 3200 })
+      await register(deps, { nondiver_option: { label: 'Snorkeler' } })
+      const details = captured.bookingInsert[0].details as Record<string, unknown>
+      expect(details.total).toBe(3200)
+      expect('nondiver_option' in details).toBe(false)
+    })
   })
 
   it('refuses a ride on an event the shop drives nobody to, and bills no transport', async () => {

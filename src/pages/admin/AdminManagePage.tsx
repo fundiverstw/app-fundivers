@@ -29,6 +29,7 @@ import { DownloadIcon } from '../../components/icons/DownloadIcon'
 import { AuditIcon } from '../../components/icons/AuditIcon'
 import { RefundIcon } from '../../components/icons/RefundIcon'
 import { DiscountIcon } from '../../components/icons/DiscountIcon'
+import { NondiverIcon } from '../../components/icons/NondiverIcon'
 import { DatabaseIcon } from '../../components/icons/DatabaseIcon'
 import { PowerIcon } from '../../components/icons/PowerIcon'
 
@@ -91,6 +92,7 @@ const GROUPS: ManageGroup[] = [
       { to: '/admin/payment-methods', icon: <CreditCardIcon />, ...m.paymentMethods },
       { to: '/admin/rooms', icon: <BedIcon />, ...m.rooms },
       { to: '/admin/addons', icon: <PlusSquareIcon />, ...m.addons },
+      { to: '/admin/nondiver-options', icon: <NondiverIcon />, ...m.nondiverOptions },
       { to: '/admin/vehicles', icon: <TruckIcon />, ...m.vehicles },
       { to: '/admin/gear-sizing', icon: <RulerIcon />, ...m.gearSizing },
     ],

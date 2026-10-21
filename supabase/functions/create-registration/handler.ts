@@ -428,6 +428,32 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
       transportPrice = (pr?.transport as number | null) ?? 0
     }
 
+    // A non-diver option replaces the diver price and deposit with its own.
+    // The request names the option; everything about it -- whether this event
+    // offers it, whether it is still active, its fee, its deposit, its label --
+    // is read here. An option the event does not offer is refused rather than
+    // priced as a diver: the person asked for something specific, and quietly
+    // billing them the diver fee would be a different booking from the one
+    // they made.
+    const nondiverId = (d.nondiver_option as { id?: unknown } | undefined)?.id
+    if (typeof nondiverId === "string" && nondiverId.length > 0) {
+      const { data: link } = await admin
+        .from("event_nondiver_options").select("option_id")
+        .eq("event_id", body.event_id).eq("option_id", nondiverId).maybeSingle()
+      const { data: opt } = link
+        ? await admin.from("nondiver_options")
+            .select("id, label, price, deposit_amount, active").eq("id", nondiverId).maybeSingle()
+        : { data: null }
+      if (!opt || !(opt as { active?: boolean }).active) {
+        return rollback(t.emails.errors.nondiverOptionNotOffered, 422)
+      }
+      base = (opt.price as number | null) ?? 0
+      depositAmount = (opt.deposit_amount as number | null) ?? 0
+      d.nondiver_option = { id: opt.id as string, label: opt.label as string }
+    } else {
+      delete d.nondiver_option
+    }
+
     const roomOpt = (d.room as { option_id?: string } | undefined)?.option_id ?? null
     let roomAddedPrice = 0
     if (roomOpt) {

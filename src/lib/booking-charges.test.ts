@@ -29,6 +29,11 @@ const TRANSFER = method({ key: 'bank_transfer', label: 'Domestic bank transfer' 
 const METHODS = new Map([CARD, CASH, TRANSFER].map(m => [m.key, m]))
 
 describe('buildCharges', () => {
+  it('names the non-diver option on the base line', () => {
+    const lines = buildCharges({ base: 1500, nondiverLabel: 'Snorkeler' })
+    expect(lines).toEqual([{ kind: 'base', label: 'Non-diver: Snorkeler', amount: 1500 }])
+  })
+
   it('always emits a base line and drops zero/empty lines', () => {
     const lines = buildCharges({ base: 2800 })
     expect(lines).toEqual([{ kind: 'base', label: 'Base', amount: 2800 }])

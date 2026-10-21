@@ -24,6 +24,9 @@ public.credits ────────── money the shop owes a diver (see p
 public.booking_discounts  one diver asking for one discount on one booking;
                           approving writes a booking_amendments row
                           (discounts ── event_discounts ── the event's offer)
+public.nondiver_options ─ snorkeler / boat passenger: own price + deposit
+                          (offered per event via event_nondiver_options;
+                          the choice lives in bookings.details)
 
 public.admin_notes ────── event_id XOR booking_id  (operational memos)
 public.diver_notes ────── per-diver standing facts (allergies, accommodations)
@@ -33,7 +36,8 @@ public.push_subscriptions / push_notifications_sent  (cron infra)
 ```
 
 Every child of an event — `bookings`, `duties`, `event_waivers`,
-`event_vehicles`, `event_ride_groups`, `event_discounts`, `notifications` —
+`event_vehicles`, `event_ride_groups`, `event_discounts`,
+`event_nondiver_options`, `notifications` —
 points at it with a plain `event_id`. There is no `eo_dive_id` / `eo_course_id` XOR anywhere in
 the schema — the only XOR left is `admin_notes`, which pins a memo to
 either an event or a booking.
@@ -131,6 +135,7 @@ Documented in their own docs rather than here:
 | --- | --- |
 | `credits` | [payments.md](./payments.md) |
 | `discounts`, `event_discounts`, `booking_discounts` | [payments.md](./payments.md#discounts) |
+| `nondiver_options`, `event_nondiver_options` | [events-and-bookings.md](./events-and-bookings.md#non-diver-options) |
 | `packages`, `package_tiers`, `package_registrations`, `package_referrals` | [packages.md](./packages.md) |
 | `trusted_partners` | [packages.md](./packages.md) (it hosts packages *and* backs the diver directory) |
 | `notifications`, `push_subscriptions`, `push_notifications_sent` | [push-notifications.md](./push-notifications.md) |
@@ -252,6 +257,11 @@ interface BookingDetails {
   }
   room?: { option_id?: string | null; notes?: string | null }
   add_ons?: string[]                // addons.id list
+  nondiver_option?: { id: string; label: string }
+                                    // set when this person registered as a
+                                    //   non-diver; label snapshotted from the
+                                    //   catalog by create-registration.
+                                    //   Absent = a diver
   discount_requests?: string[]      // discounts.id list, IN-FLIGHT ONLY: the
                                     //   register form sends it,
                                     //   create-registration turns each into a

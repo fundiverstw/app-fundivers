@@ -26,6 +26,9 @@ export interface FormState {
   // registration. Nothing here changes a price -- a diver asking for one still
   // waits on an admin's approval.
   discountIds: string[]
+  // FK multi → nondiver_options: the non-diver choices (snorkeler, boat
+  // passenger) this event offers at registration, each at its own fee.
+  nondiverOptionIds: string[]
   // Plain image URLs the shop hosts itself; the SPA stores and round-trips
   // the text (no upload/resolve).
   featured_image: string // both kinds
@@ -70,7 +73,7 @@ export const EMPTY_FORM: FormState = {
   prereq_cert_id: '',
   site_id: '',
   req_dives: '', dive_days: '',
-  addonIds: [], discountIds: [],
+  addonIds: [], discountIds: [], nondiverOptionIds: [],
   featured_image: '',
   notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
   roomIds: [],
@@ -92,10 +95,11 @@ export interface EventRelations {
   addonIds: string[]
   destinationIds: string[]
   discountIds: string[]
+  nondiverOptionIds: string[]
 }
 
 const NO_RELATIONS: EventRelations = {
-  roomIds: [], addonIds: [], destinationIds: [], discountIds: [],
+  roomIds: [], addonIds: [], destinationIds: [], discountIds: [], nondiverOptionIds: [],
 }
 
 function toHhmm(raw: string | null | undefined): string {
@@ -135,6 +139,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     dive_days: e.dive_days != null ? String(e.dive_days) : '',
     addonIds: rels.addonIds,
     discountIds: rels.discountIds,
+    nondiverOptionIds: rels.nondiverOptionIds,
     fully_booked: !!e.fully_booked,
     cancel_date: e.cancel_date ?? '',
     cancel_policy: e.cancel_policy ?? '',
