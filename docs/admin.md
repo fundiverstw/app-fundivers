@@ -141,11 +141,14 @@ afternoon is one diver, because any in-water booking wins. Each dry event
 also carries a "Dry — nobody in the water" badge on its banner and counts
 non-divers rather than divers there.
 
-The split is still per event, not per booking: somebody who registered on a
-diving event under a non-diver option (see
+The split is per person as well as per event: somebody who registered on a
+diving event under a non-diver option (a snorkeler, a boat passenger — see
 [events-and-bookings.md § Non-diver options](./events-and-bookings.md#non-diver-options))
-is counted with that event's divers here. Their option shows on their card
-on the event page.
+is a non-diver too. `bookingEntersWater()` in `src/lib/participants.ts`
+answers it. On the board they get the same orange as a dry event: their own
+**Non-divers** group under the event, a chip reading "Bo · Snorkeler", a
+"1 diver · 1 non-diver" banner, and a "Non-diver · Snorkeler" pill on their
+gear card, since they may still rent fins or a wetsuit.
 
 ## Transport: runs, seats, riders
 

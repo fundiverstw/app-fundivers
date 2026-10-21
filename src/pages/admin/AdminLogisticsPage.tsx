@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { splitByTransport, transportHeadcount, dayKeyOffset, partitionByWaitlist } from '../../lib/logistics'
-import { dayRoster, eventEntersWater } from '../../lib/participants'
+import { bookingEntersWater, dayRoster, eventEntersWater, nondiverLabel } from '../../lib/participants'
 import { guestPieces, packProgress, piecesByItem, type PackGuest, type PackPiece } from '../../lib/pack-list'
 import { gearPackList } from '../../lib/gear'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
@@ -494,7 +494,14 @@ export function AdminLogisticsPage() {
   }
 
   const promptForDay = tab === 'other' && !otherDay
-  const banner = (g: EventGroup) => <EventBanner event={g.event} headcount={g.rows.length} isAdmin={isAdmin} />
+  const banner = (g: EventGroup) => (
+    <EventBanner
+      event={g.event}
+      headcount={g.rows.length}
+      nondivers={g.rows.filter(r => nondiverLabel(r.booking) !== null).length}
+      isAdmin={isAdmin}
+    />
+  )
 
   return (
     <div className="max-w-3xl mx-auto space-y-4">
@@ -696,26 +703,37 @@ export function AdminLogisticsPage() {
               </div>
               {groups.map(g => {
                 const { seated, waitlisted } = partitionByWaitlist(g.rows)
-                const dry = !eventEntersWater(g.event)
+                // Who gets in the water, person by person: a dry event puts
+                // nobody in, and on a wet one anyone who registered under a
+                // non-diver option (a snorkeler, a boat passenger) stays out.
+                const divers = seated.filter(r => bookingEntersWater(g.event, r.booking))
+                const nonDivers = seated.filter(r => !bookingEntersWater(g.event, r.booking))
+                const chip = (r: DiverGearRow, className: string) => {
+                  const name = personName(r.profile?.name) || tp.noProfile
+                  const option = nondiverLabel(r.booking)
+                  return (
+                    <PersonChip key={r.booking.id} name={name} profileId={r.profile?.id ?? null} linked={isAdmin} className={className}>
+                      {option ? <>{name}<span className="opacity-75"> · {option}</span></> : undefined}
+                    </PersonChip>
+                  )
+                }
                 return (
                   <section key={g.event.id} className="space-y-2">
                     {banner(g)}
                     <StaffDutyGroup rows={g.staff} />
-                    {seated.length > 0 && (
-                      <div role="group" aria-label={dry ? lg.nonDiversOnDay : lg.diversOnDay} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
-                        <h3 className={`text-sm font-bold ${dry ? 'text-orange-300' : 'text-brand-900'}`}>
-                          {dry ? lg.nonDiversOnDay : lg.diversOnDay}
-                        </h3>
+                    {divers.length > 0 && (
+                      <div role="group" aria-label={lg.diversOnDay} className="bg-white/70 backdrop-blur-md border border-surface-200 rounded-xl p-4 space-y-2">
+                        <h3 className="text-sm font-bold text-brand-900">{lg.diversOnDay}</h3>
                         <div className="flex flex-wrap gap-1.5">
-                          {seated.map(r => (
-                            <PersonChip
-                              key={r.booking.id}
-                              name={personName(r.profile?.name) || tp.noProfile}
-                              profileId={r.profile?.id ?? null}
-                              linked={isAdmin}
-                              className={dry ? NON_DIVER_CHIP : NAME_CHIP}
-                            />
-                          ))}
+                          {divers.map(r => chip(r, NAME_CHIP))}
+                        </div>
+                      </div>
+                    )}
+                    {nonDivers.length > 0 && (
+                      <div role="group" aria-label={lg.nonDiversOnDay} className="bg-white/70 backdrop-blur-md border border-orange-400/40 rounded-xl p-4 space-y-2">
+                        <h3 className="text-sm font-bold text-orange-300">{lg.nonDiversOnDay}</h3>
+                        <div className="flex flex-wrap gap-1.5">
+                          {nonDivers.map(r => chip(r, NON_DIVER_CHIP))}
                         </div>
                       </div>
                     )}
@@ -919,7 +937,13 @@ function ItemPackList({ guests, packed, onToggle }: {
 
 /** One event's banner, the same in every section so a crew always knows which
  *  trip the list under it belongs to. */
-function EventBanner({ event, headcount, isAdmin }: { event: AppEvent; headcount: number; isAdmin: boolean }) {
+function EventBanner({ event, headcount, nondivers, isAdmin }: {
+  event: AppEvent
+  headcount: number
+  /** Of the headcount, how many registered under a non-diver option. */
+  nondivers: number
+  isAdmin: boolean
+}) {
   const dry = !eventEntersWater(event)
   return (
     <div className="bg-brand-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
@@ -940,7 +964,12 @@ function EventBanner({ event, headcount, isAdmin }: { event: AppEvent; headcount
       </div>
       <span className="block text-xs text-white/80">
         {formatEventSpan(event, { style: 'compact' })}
-        {' · '}{dry ? lg.nonDiverCount(headcount) : lg.diverCount(headcount)}
+        {' · '}{dry
+          ? lg.nonDiverCount(headcount)
+          : <>
+              {lg.diverCount(headcount - nondivers)}
+              {nondivers > 0 && <> · <span className="text-orange-200 font-semibold">{lg.nonDiverCount(nondivers)}</span></>}
+            </>}
       </span>
       {dry && (
         <span className="inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-orange-300/60 bg-orange-500/20 text-orange-100">

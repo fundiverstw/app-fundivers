@@ -37,6 +37,22 @@ describe('GuestPackCard', () => {
     expect(screen.getByText('0 of 3 packed')).toBeInTheDocument()
   })
 
+  it('flags a guest who registered as a non-diver, and nobody else', () => {
+    const snorkeler = {
+      ...row,
+      booking: { ...row.booking, details: { ...row.booking.details, nondiver_option: { id: 'nd1', label: 'Snorkeler' } } } as Booking,
+    }
+    const { unmount } = render(
+      <MemoryRouter>
+        <GuestPackCard row={snorkeler} pieces={pieces} packed={new Set()} onToggle={vi.fn()} onSetAll={vi.fn()} onProfilePatched={vi.fn()} />
+      </MemoryRouter>,
+    )
+    expect(screen.getByText('Non-diver · Snorkeler')).toBeInTheDocument()
+    unmount()
+    renderCard()
+    expect(screen.queryByText(/non-diver/i)).not.toBeInTheDocument()
+  })
+
   it('reports a tapped piece by its key, and the whole kit from Pack all', async () => {
     const user = userEvent.setup()
     const { onToggle, onSetAll } = renderCard()

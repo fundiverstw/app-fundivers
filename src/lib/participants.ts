@@ -20,13 +20,31 @@ export function eventEntersWater(event: Pick<AppEvent, 'type' | 'enters_water'>)
   return entersTheWater(event.type) && event.enters_water !== false
 }
 
+/**
+ * The non-diver option a booking was made under ("Snorkeler"), or null for a
+ * diver. Someone on an option comes on a diving event without diving, so the
+ * board counts and shows them as a non-diver whatever the event says.
+ */
+export function nondiverLabel(booking: Pick<Booking, 'details'>): string | null {
+  return booking.details?.nondiver_option?.label ?? null
+}
+
+/** Does this person go in the water on this event? Both have to say yes. */
+export function bookingEntersWater(
+  event: Pick<AppEvent, 'type' | 'enters_water'>,
+  booking: Pick<Booking, 'details'>,
+): boolean {
+  return eventEntersWater(event) && nondiverLabel(booking) === null
+}
+
 /** A booking with the person behind it — what the logistics board holds. */
 export interface RosterRow {
   booking: Booking
   profile: Profile | null
 }
 
-/** One of the day's events, already answered for water, and who is on it. */
+/** One of the day's events, already answered for water, and who is on it.
+ *  A row on a non-diver option stays dry even when the event is wet. */
 export interface RosterGroup {
   entersWater: boolean
   rows: RosterRow[]
@@ -60,16 +78,17 @@ export function dayRoster(groups: RosterGroup[], noProfileLabel: string): DayPer
   for (const group of groups) {
     for (const r of group.rows) {
       const key = r.profile?.id ?? r.booking.id
+      const inWater = group.entersWater && nondiverLabel(r.booking) === null
       const existing = byKey.get(key)
       if (existing) {
-        existing.inWater ||= group.entersWater
+        existing.inWater ||= inWater
         continue
       }
       byKey.set(key, {
         key,
         name: personName(r.profile?.name) || noProfileLabel,
         profileId: r.profile?.id ?? null,
-        inWater: group.entersWater,
+        inWater,
       })
     }
   }

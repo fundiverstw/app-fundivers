@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { dayRoster, eventEntersWater } from './participants'
+import { bookingEntersWater, dayRoster, eventEntersWater, nondiverLabel } from './participants'
 import type { AppEvent, Booking, Profile } from '../types/database'
 
 const event = (type: AppEvent['type'], enters_water: boolean) =>
@@ -49,6 +49,15 @@ describe('dayRoster', () => {
     expect(roster[0].inWater).toBe(true)
   })
 
+  it('counts someone on a non-diver option as a non-diver, even on a diving event', () => {
+    const snorkeler = {
+      booking: { id: 'b-p2', details: { nondiver_option: { id: 'nd1', label: 'Snorkeler' } } } as unknown as Booking,
+      profile: { id: 'p2', name: 'Bo' } as unknown as Profile,
+    }
+    const roster = dayRoster([{ entersWater: true, rows: [person('p1', 'Ada'), snorkeler] }], '(no profile)')
+    expect(roster.map(p => [p.name, p.inWater])).toEqual([['Ada', true], ['Bo', false]])
+  })
+
   it('keys a row with no profile by its booking, so those never merge', () => {
     const orphan = (bookingId: string) => ({ booking: { id: bookingId } as unknown as Booking, profile: null })
     const roster = dayRoster([{ entersWater: true, rows: [orphan('b1'), orphan('b2')] }], '(no profile)')
@@ -59,5 +68,22 @@ describe('dayRoster', () => {
   it('sorts by name so the list reads the same on every reload', () => {
     const roster = dayRoster([{ entersWater: true, rows: [person('p2', 'Zoe'), person('p1', 'Ada')] }], '(no profile)')
     expect(roster.map(p => p.name)).toEqual(['Ada', 'Zoe'])
+  })
+})
+
+describe('nondiverLabel / bookingEntersWater', () => {
+  const diver = { details: {} } as Pick<Booking, 'details'>
+  const snorkeler = { details: { nondiver_option: { id: 'nd1', label: 'Snorkeler' } } } as Pick<Booking, 'details'>
+
+  it('names the option, or null for a diver', () => {
+    expect(nondiverLabel(snorkeler)).toBe('Snorkeler')
+    expect(nondiverLabel(diver)).toBeNull()
+    expect(nondiverLabel({ details: null } as unknown as Pick<Booking, 'details'>)).toBeNull()
+  })
+
+  it('needs both the event and the booking to say yes', () => {
+    expect(bookingEntersWater(event('dive', true), diver)).toBe(true)
+    expect(bookingEntersWater(event('dive', true), snorkeler)).toBe(false)
+    expect(bookingEntersWater(event('course', false), diver)).toBe(false)
   })
 })

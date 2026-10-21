@@ -579,6 +579,29 @@ describe('AdminLogisticsPage — people', () => {
     expect(within(people).getByText(t.admin.logistics.dryEventBadge)).toBeInTheDocument()
   })
 
+  it('marks someone on a non-diver option as a non-diver on a diving event', async () => {
+    const user = userEvent.setup()
+    // One fun dive: Ada dives, Bo comes along snorkelling.
+    mockDay({ bookingRows: [
+      { id: 'b1', user_id: 'u1', event_id: 'e1', status: 'confirmed', details: {} },
+      { id: 'b2', user_id: 'u2', event_id: 'e1', status: 'confirmed',
+        details: { nondiver_option: { id: 'nd1', label: 'Snorkeler' } } },
+    ] })
+    renderPage()
+    const people = await openSection(user, /^people/i)
+
+    // The day count and the event banner both split the two.
+    expect(within(people).getByText(/1 event · 1 diver/i)).toHaveTextContent(/1 non-diver/i)
+    const section = within(people).getByRole('link', { name: 'Kenting fun dive' }).closest('section')!
+    expect(within(section).getByText(/· 1 diver/i)).toHaveTextContent(/1 diver · 1 non-diver/i)
+
+    const divers = within(section).getByRole('group', { name: t.admin.logistics.diversOnDay })
+    expect(within(divers).getByText('Ada')).toBeInTheDocument()
+    expect(within(divers).queryByText(/Bo/)).not.toBeInTheDocument()
+    const nonDivers = within(section).getByRole('group', { name: t.admin.logistics.nonDiversOnDay })
+    expect(within(nonDivers).getByText(/Bo/)).toHaveTextContent('Bo · Snorkeler')
+  })
+
   it('lists on-duty staff per event with their role', async () => {
     const user = userEvent.setup()
     mockDay({

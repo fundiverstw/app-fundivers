@@ -2588,7 +2588,8 @@ export const en = {
       // marker on a diver chip: the shop's insurer asks for the two counts.
       nonDiversOnDay: 'Non-divers',
       nonDiverCount: (n: number) => `${n} non-diver${n === 1 ? '' : 's'}`,
-      nonDiverHint: 'On the roster, not in the water — EFR/CPR students, BBQ guests, anyone staying ashore.',
+      nondiverTag: (label: string) => `Non-diver · ${label}`,
+      nonDiverHint: 'On the roster, not diving — EFR/CPR students, BBQ guests, and anyone who registered as a non-diver (a snorkeler, a boat passenger).',
       dryEventBadge: 'Dry — nobody in the water',
       // Every name on the board's People section opens that person's directory card.
       viewProfile: (name: string) => `View ${name}'s profile`,
