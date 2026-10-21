@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { sortByLocation } from './sort-by-location'
 import type { TrustedPartner, TrustedPartnerRow, TrustedPartnerInsert } from '../types/database'
 
 // Data layer for the unified trusted_partners table (20260707220000 — one table
@@ -17,20 +18,6 @@ export async function fetchTrustedPartners(): Promise<TrustedPartner[]> {
   const { data, error } = await supabase.rpc('list_trusted_partners')
   if (error) throw error
   return sortByLocation((data ?? []) as TrustedPartner[], p => p.region)
-}
-
-const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
-
-// A–Z by location (case-insensitive), then name; partners with no location last.
-export function sortByLocation<T extends { name: string | null }>(
-  partners: T[], locationOf: (p: T) => string | null | undefined,
-): T[] {
-  return [...partners].sort((a, b) => {
-    const ra = locationOf(a)?.trim() ?? ''
-    const rb = locationOf(b)?.trim() ?? ''
-    if (!ra !== !rb) return ra ? -1 : 1
-    return collator.compare(ra, rb) || collator.compare(a.name ?? '', b.name ?? '')
-  })
 }
 
 // Diver-facing: send a message to one partner. The edge function emails the

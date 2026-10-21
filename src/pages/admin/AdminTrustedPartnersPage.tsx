@@ -1,7 +1,8 @@
 import { useEffect, useState, type ReactNode, type FormEvent } from 'react'
 import { useToast } from '../../hooks/useToast'
 import { errorMessage } from '../../lib/errors'
-import { fetchAllTrustedPartners, saveTrustedPartner, deleteTrustedPartner, sortByLocation } from '../../lib/trusted-partners'
+import { fetchAllTrustedPartners, saveTrustedPartner, deleteTrustedPartner } from '../../lib/trusted-partners'
+import { sortByLocation } from '../../lib/sort-by-location'
 import type { TrustedPartnerRow, TrustedPartnerInsert } from '../../types/database'
 import { t } from '../../i18n'
 

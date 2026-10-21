@@ -6,8 +6,7 @@ import { AdminTrustedPartnersPage } from './AdminTrustedPartnersPage'
 import type { TrustedPartnerRow } from '../../types/database'
 
 const { fetchAll, save, del } = vi.hoisted(() => ({ fetchAll: vi.fn(), save: vi.fn(), del: vi.fn() }))
-vi.mock('../../lib/trusted-partners', async (importActual) => ({
-  sortByLocation: (await importActual<typeof import('../../lib/trusted-partners')>()).sortByLocation,
+vi.mock('../../lib/trusted-partners', () => ({
   fetchAllTrustedPartners: (...a: unknown[]) => fetchAll(...a),
   saveTrustedPartner: (...a: unknown[]) => save(...a),
   deleteTrustedPartner: (...a: unknown[]) => del(...a),
