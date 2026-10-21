@@ -16,15 +16,18 @@ import type { TrustedPartner, TrustedPartnerRow, TrustedPartnerInsert } from '..
 export async function fetchTrustedPartners(): Promise<TrustedPartner[]> {
   const { data, error } = await supabase.rpc('list_trusted_partners')
   if (error) throw error
-  return sortByLocation((data ?? []) as TrustedPartner[])
+  return sortByLocation((data ?? []) as TrustedPartner[], p => p.region)
 }
 
 const collator = new Intl.Collator(undefined, { sensitivity: 'base', numeric: true })
 
-export function sortByLocation(partners: TrustedPartner[]): TrustedPartner[] {
+// A–Z by location (case-insensitive), then name; partners with no location last.
+export function sortByLocation<T extends { name: string | null }>(
+  partners: T[], locationOf: (p: T) => string | null | undefined,
+): T[] {
   return [...partners].sort((a, b) => {
-    const ra = a.region?.trim() ?? ''
-    const rb = b.region?.trim() ?? ''
+    const ra = locationOf(a)?.trim() ?? ''
+    const rb = locationOf(b)?.trim() ?? ''
     if (!ra !== !rb) return ra ? -1 : 1
     return collator.compare(ra, rb) || collator.compare(a.name ?? '', b.name ?? '')
   })
