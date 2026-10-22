@@ -48,7 +48,7 @@ describe('gearPackList', () => {
 describe('packsAGearSet', () => {
   // The flag alone cannot tell a Discover Scuba (a set is bundled and has to
   // fit somebody) from a hike whose fee "includes gear" because there is none.
-  it('packs a set for a gear-included event that goes in the water', () => {
+  it('packs a set for a gear-included scuba event', () => {
     expect(packsAGearSet({ gear_included: true, type: 'course' })).toBe(true)
     expect(packsAGearSet({ gear_included: true, type: 'dive' })).toBe(true)
   })
@@ -81,7 +81,7 @@ describe('suggestsGearIncluded', () => {
     expect(suggestsGearIncluded('course', 'Emergency First Response')).toBe(true)
   })
 
-  // Not a dive and not a course: nothing goes in the water, so there is no
+  // Not a dive and not a course: nobody scuba dives, so there is no
   // gear question worth putting whatever it is called.
   it('suggests gear-included for every non-diving kind', () => {
     expect(suggestsGearIncluded('adventure', 'Yangmingshan Hike')).toBe(true)
