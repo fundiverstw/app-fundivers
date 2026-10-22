@@ -11,7 +11,8 @@ import { RENTAL_GEAR_ITEMS, GEAR_ALACARTE_PRICES, HAS_RENTAL_GEAR_ALTERNATIVES, 
 import { needsShoeSize } from '../../lib/logistics'
 import { siteConfig } from '../../config/site'
 import { discountValueLabel, fetchDiscountsForEvent } from '../../lib/discounts'
-import { DIVER, fetchNondiverOptionsForEvent, participantPricing } from '../../lib/nondiver-options'
+import { ParticipantChoice } from './ParticipantChoice'
+import { DIVER, fetchNondiverOptionsForBooking, fetchNondiverOptionsForEvent, participantPricing } from '../../lib/nondiver-options'
 import { t } from '../../i18n'
 import { BTN_XS_GHOST, INPUT_REGISTER } from '../../styles/tokens'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
@@ -645,6 +646,9 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // figures, or their non-diver option's.
   const pricingFor = (choice: string) => participantPricing(choice, nondiverOptions, event)
   const primaryPricing = pricingFor(participant)
+  // The bundled set on a gear-included event is scuba kit. A non-diver gets
+  // none, so nothing is packed for them and no size is asked for it.
+  const packsSetFor = (choice: string) => gearPacksASet && choice === DIVER
   // Whether anyone on this booking has a deposit to pay — what puts the
   // "pay the deposit now" choice on screen. Each booking still applies its own
   // person's deposit (or none) below.
@@ -722,7 +726,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
   // there is no choice to offer -- but it still has to fit, which is the one
   // thing an unasked question can't tell us.
   const rentingGear = showGearRentChoice && gearChoice === 'rent'
-  const packedItems = gearPacksASet ? FULL_GEAR_SET : (rentingGear ? gearItems : [])
+  const packedItems = packsSetFor(participant) ? FULL_GEAR_SET : (rentingGear ? gearItems : [])
   // Height and weight are asked of everyone on step 2; shoe size is the one
   // measurement narrow enough to ask only when something goes on a foot, and
   // only when the profile hasn't already got it.
@@ -885,7 +889,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
       const offered = await fetchDiscountsForEvent(event.id).catch(() => [] as Discount[])
       if (!cancelled) setDiscounts(offered)
-      const nondivers = await fetchNondiverOptionsForEvent(event.id).catch(() => [] as NondiverOption[])
+      // Editing keeps the booking's own option on the list even if the event
+      // no longer offers it, so saving never quietly re-prices them as a diver.
+      const nondivers = await (initialDetails
+        ? fetchNondiverOptionsForBooking(event.id, initialDetails)
+        : fetchNondiverOptionsForEvent(event.id)
+      ).catch(() => [] as NondiverOption[])
       if (!cancelled) setNondiverOptions(nondivers)
       if (event.cancel_policy) {
         const { data } = await supabase
@@ -897,7 +906,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       }
     })()
     return () => { cancelled = true }
-  }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids, event.cancel_policy])
+  }, [event.id, showRooms, showAddons, event.room_type_ids, event.addon_ids, event.cancel_policy, initialDetails])
 
   // Load spendable account credit for every diver whose booking this submit
   // creates — the primary target plus any additional family picks — so step 4
@@ -1279,8 +1288,8 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
       emergency_contact_phone: nullish(emergencyPhone),
     }
 
-    const gearDetail = (choice: GearChoice | null, items: string[], helpNote: string): BookingDetails['gear'] =>
-      gearPacksASet
+    const gearDetail = (choice: GearChoice | null, items: string[], helpNote: string, who: string): BookingDetails['gear'] =>
+      packsSetFor(who)
         ? { rent: false, included: true }
         : !showGearRentChoice
           ? { rent: false }
@@ -1291,7 +1300,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
               : { rent: false }
 
     const details: BookingDetails = {
-      gear: gearDetail(gearChoice, gearItems, gearHelpNote),
+      gear: gearDetail(gearChoice, gearItems, gearHelpNote, participant),
       room: (showRooms && roomId) ? { option_id: roomId, notes: roomNotes || null } : undefined,
       add_ons: showAddons ? [...addonIds] : [],
       nondiver_option: nondiverRef(participant),
@@ -1335,7 +1344,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
     // booked, so it carries over unchanged.
     const detailsForTarget = (m: typeof additionalMoney[number]): BookingDetails => ({
       ...details,
-      gear: gearDetail(m.pick.choice, m.pick.items, m.pick.helpNote),
+      gear: gearDetail(m.pick.choice, m.pick.items, m.pick.helpNote, m.choice),
       nondiver_option: nondiverRef(m.choice),
       charges: chargesFor((showGearRentChoice && m.pick.choice === 'rent') ? m.pick.items : [], m, m.choice),
       total: m.total,
@@ -2049,11 +2058,11 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
         <section className="space-y-4">
           <h2 className="text-lg font-bold text-brand-900">{t.register.extras.title}</h2>
 
-          {!gearPacksASet && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
+          {!packsSetFor(participant) && !showGearRentChoice && !showRooms && !showAddons && !showNitroxAddon && (
             <p className="text-brand-900 font-medium text-sm">{t.register.extras.none}</p>
           )}
 
-          {gearPacksASet && (
+          {packsSetFor(participant) && (
             <div className="space-y-1">
               <p className="text-sm text-brand-950 font-medium">
                 {t.register.gear.includedNote}
@@ -2110,9 +2119,12 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
           )}
 
           {(showGearRentChoice || gearPacksASet) && additionalTargets.map(tg => {
+            const targetPacksSet = packsSetFor(participantFor(tg.id))
+            // A gear-included event asks nothing of a non-diver: no set, no size.
+            if (!showGearRentChoice && !targetPacksSet) return null
             const pick = gearPickFor(tg)
             const name = personName(tg.name) || t.register.results.diverFallback
-            const packedForTarget = gearPacksASet
+            const packedForTarget = targetPacksSet
               ? FULL_GEAR_SET
               : (pick.choice === 'rent' ? pick.items : [])
             return (
@@ -2665,49 +2677,5 @@ function PaymentInstructionLine({ line }: { line: string }) {
       </a>
       {after}
     </p>
-  )
-}
-
-// Small labeled input for the About-you step. The label associates by id
-// rather than by wrapping: a date field renders a second, transparent native
-// input for the OS picker, and a wrapping label would claim that one too —
-// ambiguous for screen readers and for tests querying by label.
-
-// "Registering as" for one person: the diver price, or one of the event's
-// non-diver options at its own price. Radios rather than a select so every
-// price is visible before anyone picks.
-function ParticipantChoice({ name, heading, value, onChange, options, event }: {
-  name: string
-  heading: string
-  value: string
-  onChange: (choice: string) => void
-  options: NondiverOption[]
-  event: Pick<AppEvent, 'price' | 'deposit_amount' | 'currency'>
-}) {
-  const p = t.register.participant
-  const money = (n: number) => p.price(event.currency, n.toLocaleString())
-  const rows: Array<{ id: string; label: string; price: number | null; deposit: number | null; description: string | null }> = [
-    { id: DIVER, label: p.diver, price: event.price ?? null, deposit: event.deposit_amount ?? null, description: null },
-    ...options.map(o => ({ id: o.id, label: o.label, price: o.price, deposit: o.deposit_amount, description: o.description })),
-  ]
-  return (
-    <fieldset className="space-y-1">
-      <legend className="text-sm font-semibold text-brand-900">{heading}</legend>
-      {rows.map(r => (
-        <label key={r.id} className="flex items-start gap-2 text-sm text-brand-950 font-medium">
-          <input type="radio" name={name} checked={value === r.id} onChange={() => onChange(r.id)} className="accent-brand-900 mt-1" />
-          <span className="flex-1 min-w-0">
-            <span className="block">
-              {r.label}
-              {r.price != null && <span className="ml-2 tabular-nums">{money(r.price)}</span>}
-            </span>
-            {r.deposit != null && r.deposit > 0 && (
-              <span className="block text-xs text-brand-950/70 tabular-nums">{p.deposit(event.currency, r.deposit.toLocaleString())}</span>
-            )}
-            {r.description && <span className="block text-xs text-brand-950/70 break-words">{r.description}</span>}
-          </span>
-        </label>
-      ))}
-    </fieldset>
   )
 }

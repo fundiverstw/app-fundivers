@@ -584,3 +584,81 @@ describe('MultiRegisterForm parent diver picker', () => {
     await waitFor(() => expect(onAll).toHaveBeenCalled())
   })
 })
+
+describe('MultiRegisterForm non-diver options', () => {
+  const SNORKELER = {
+    id: 'nd1', created_at: '', created_by: null,
+    label: 'Snorkeler', description: null,
+    price: 1500, deposit_amount: 500, active: true, sort_order: 0,
+  }
+
+  function setupWithOption() {
+    from.mockImplementation((table: string) => {
+      if (table === 'profiles') return mockQueryBuilder({ data: [] })
+      if (table === 'waivers') return mockQueryBuilder({ data: WAIVER_ROWS })
+      if (table === 'payment_methods') return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+      if (table === 'event_nondiver_options') return mockQueryBuilder({ data: [{ option_id: 'nd1' }] })
+      if (table === 'nondiver_options') return mockQueryBuilder({ data: [SNORKELER] })
+      return mockQueryBuilder()
+    })
+  }
+
+  async function bookCart(user: ReturnType<typeof userEvent.setup>, event: AppEvent, pick: RegExp | null) {
+    render(
+      <MultiRegisterForm events={[event]} profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}} />
+    )
+    if (pick) await user.click(await screen.findByLabelText(pick))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    await user.click(screen.getByRole('button', { name: /next/i }))
+    return async () => {
+      await user.click(screen.getByLabelText(/No, I'll get there myself/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalled())
+      return (invoke.mock.calls[0][1] as { body: { details: Record<string, unknown> } }).body.details
+    }
+  }
+
+  it('offers the event\'s options and books the pick at its own price, with its name on the charge', async () => {
+    setupWithOption()
+    const user = userEvent.setup()
+    const finish = await bookCart(user, sampleEvent('e1', 'Kenting'), /snorkeler/i)
+    const details = await finish()
+    expect(details.nondiver_option).toEqual({ id: 'nd1', label: 'Snorkeler' })
+    expect(details.total).toBe(1500)
+    expect(details.deposit).toBe(500)
+    expect((details.charges as Array<{ label: string; amount: number }>)[0])
+      .toEqual({ kind: 'base', label: 'Non-diver: Snorkeler', amount: 1500 })
+  })
+
+  it('books a diver at the diver price when nobody picks an option', async () => {
+    setupWithOption()
+    const user = userEvent.setup()
+    const finish = await bookCart(user, sampleEvent('e1', 'Kenting'), null)
+    const details = await finish()
+    expect(details.nondiver_option).toBeUndefined()
+    expect(details.total).toBe(2800)
+  })
+
+  it('packs no bundled scuba set for a non-diver on a gear-included course', async () => {
+    setupWithOption()
+    const user = userEvent.setup()
+    const dsd: AppEvent = { ...sampleEvent('e1', 'Discover Scuba Diving'), type: 'course', gear_included: true }
+    const finish = await bookCart(user, dsd, /snorkeler/i)
+    expect(screen.queryByText(t.register.multi.gearIncluded)).not.toBeInTheDocument()
+    expect(screen.queryByText(t.register.gear.sizesTitle)).not.toBeInTheDocument()
+    const details = await finish()
+    expect(details.gear).toEqual({ rent: false })
+  })
+
+  it('puts no choice on an event that offers no options', async () => {
+    setupFrom([])
+    render(
+      <MultiRegisterForm events={[sampleEvent('e1', 'Kenting')]} profile={parentProfile} userId="p1"
+        onClose={() => {}} onAllBooked={() => {}} />
+    )
+    await waitFor(() => expect(from).toHaveBeenCalledWith('profiles'))
+    expect(screen.queryByText(t.register.participant.heading)).not.toBeInTheDocument()
+  })
+})

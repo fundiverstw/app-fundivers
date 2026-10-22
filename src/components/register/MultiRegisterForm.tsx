@@ -5,6 +5,8 @@ import { needsShoeSize } from '../../lib/logistics'
 import { siteConfig } from '../../config/site'
 import { t } from '../../i18n'
 import { buildCharges, NITROX_COURSE_FEE } from '../../lib/booking-charges'
+import { DIVER, fetchNondiverOptionsForEvent, participantPricing } from '../../lib/nondiver-options'
+import { ParticipantChoice } from './ParticipantChoice'
 import { surchargeRateFor, paymentMethodLabel } from '../../lib/payment-method-format'
 import { fetchActivePaymentMethods } from '../../lib/payment-methods'
 import { supabase } from '../../lib/supabase'
@@ -22,7 +24,7 @@ import { INPUT_REGISTER } from '../../styles/tokens'
 import { numOrNullStr } from '../../lib/units'
 import { ShoeSizeField } from '../ShoeSizeField'
 import type { WaiverDef } from '../../config/waivers'
-import type { AppEvent, Booking, BookingDetails, Database, PaymentMethod, Profile } from '../../types/database'
+import type { AppEvent, Booking, BookingDetails, Database, NondiverOption, PaymentMethod, Profile } from '../../types/database'
 
 type ProfileUpdate = Database['public']['Tables']['profiles']['Update']
 
@@ -40,6 +42,8 @@ interface EventChoices {
   gearItems:       string[]
   needsTransport:  boolean | null
   addNitroxCourse: boolean
+  // DIVER, or the id of one of the event's non-diver options.
+  participant:     string
 }
 
 interface Props {
@@ -171,10 +175,33 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
         gearItems:       [],
         needsTransport:  null,
         addNitroxCourse: false,
+        participant:     DIVER,
       }
     }
     return init
   })
+
+  // The non-diver options each cart event offers, keyed by event id. An event
+  // that offers none (or whose lookup fails) books everyone as a diver, which
+  // is what the server prices when no option is named.
+  const [nondiverByEvent, setNondiverByEvent] = useState<Record<string, NondiverOption[]>>({})
+  useEffect(() => {
+    let cancelled = false
+    for (const ev of cart) {
+      fetchNondiverOptionsForEvent(ev.id)
+        .then(opts => { if (!cancelled) setNondiverByEvent(prev => ({ ...prev, [ev.id]: opts })) })
+        .catch(() => { /* no options for that event */ })
+    }
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rideEventKey])
+  const participantOf = (ev: AppEvent) => choicesById[ev.id]?.participant ?? DIVER
+  const nondiverOf = (ev: AppEvent) => {
+    const choice = participantOf(ev)
+    return choice === DIVER ? null : (nondiverByEvent[ev.id] ?? []).find(o => o.id === choice) ?? null
+  }
+  // The bundled set on a gear-included event is scuba kit; a non-diver gets none.
+  const packsSetFor = (ev: AppEvent) => packsAGearSet(ev) && nondiverOf(ev) === null
 
   // Profile fields — same shape as RegisterFormBody but trimmed to what
   // actually matters for a confirmed-attendance form. Card uploads are
@@ -231,8 +258,10 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   const eventBreakdowns = useMemo(() => {
     const surcharge = surchargeRateFor(selectedMethod)
     return cart.map(ev => {
-      const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false }
-      const base       = ev.price ?? 0
+      const c = choicesById[ev.id] ?? { rentGear: false, gearItems: [], needsTransport: null, addNitroxCourse: false, participant: DIVER }
+      const pricing    = participantPricing(c.participant, nondiverByEvent[ev.id] ?? [], ev)
+      const nondiver   = pricing.option ? (nondiverByEvent[ev.id] ?? []).find(o => o.id === pricing.option) ?? null : null
+      const base       = pricing.base
       const days       = Math.max(1, ev.dive_days ?? 1)
       const gearIncluded = ev.gear_included
       const gearCost   = (!gearIncluded && c.rentGear)
@@ -251,6 +280,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
       const total = subTotal + surchargeCost
       const charges = buildCharges({
         base,
+        nondiverLabel: nondiver?.label ?? null,
         gear: (!gearIncluded && c.rentGear)
           ? c.gearItems.map(item => ({ item, amount: (GEAR_ALACARTE_PRICES[item] ?? 0) * days }))
           : [],
@@ -261,9 +291,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           ? { label: t.chargeLines.surcharge(selectedMethod.label, Number(selectedMethod.surcharge_percent), false), amount: surchargeCost }
           : null,
       })
-      return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges }
+      return { base, gearCost, transportCost, nitroxFee, surchargeCost, total, charges, nondiver, depositAmount: pricing.depositAmount }
     })
-  }, [cart, choicesById, selectedMethod, profile, forDiverByEvent, childById])
+  }, [cart, choicesById, selectedMethod, profile, forDiverByEvent, childById, nondiverByEvent])
 
   const grandTotal = eventBreakdowns.reduce((s, b) => s + b.total, 0)
 
@@ -296,7 +326,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
   // child's profile, so a size typed here would land on the wrong diver.
   const packedForSelf = cart.flatMap(ev => {
     if ((forDiverByEvent[ev.id] ?? null) !== null) return []
-    if (packsAGearSet(ev)) return [...FULL_GEAR_SET]
+    if (packsSetFor(ev)) return [...FULL_GEAR_SET]
     const c = choicesById[ev.id]
     return c?.rentGear ? c.gearItems : []
   })
@@ -340,7 +370,8 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
     // circuiting on the first error.
     const calls = cart.map(async (ev) => {
       const c = choicesById[ev.id]
-      const gearPacksASet = packsAGearSet(ev)
+      const gearPacksASet = packsSetFor(ev)
+      const breakdown = eventBreakdowns[cart.indexOf(ev)]
       // When the booking is for a linked child, look up nitrox status on
       // the child's profile (not the parent's) so we don't show / charge
       // for a nitrox course they don't need.
@@ -362,6 +393,9 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           ? { rent: false, included: true }
           : (c.rentGear ? { rent: true, items: c.gearItems } : { rent: false }),
         add_ons: [],
+        nondiver_option: breakdown?.nondiver
+          ? { id: breakdown.nondiver.id, label: breakdown.nondiver.label }
+          : undefined,
         transportation: c.needsTransport === true,
         ride_waitlisted: rideWaitlisted,
         payment_method: payment,
@@ -370,9 +404,11 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
           : undefined,
         pay_deposit_only: false,
         nitrox_course_addon: showNitroxAddon && c.addNitroxCourse,
-        charges: eventBreakdowns[cart.indexOf(ev)]?.charges,
-        total: eventBreakdowns[cart.indexOf(ev)]?.total,
-        deposit: ev.deposit_amount ?? undefined,
+        charges: breakdown?.charges,
+        total: breakdown?.total,
+        // The cart pays in full; the deposit is recorded as the threshold the
+        // shop confirms on, and a non-diver option carries its own (or none).
+        deposit: breakdown && breakdown.depositAmount > 0 ? breakdown.depositAmount : undefined,
       }
 
       // Self-targeted bookings update the parent's profile with whatever
@@ -540,6 +576,16 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
                       </select>
                     </label>
                   )}
+                  {(nondiverByEvent[ev.id]?.length ?? 0) > 0 && (
+                    <ParticipantChoice
+                      name={`participant-${ev.id}`}
+                      heading={t.register.participant.heading}
+                      value={participantOf(ev)}
+                      onChange={choice => updateChoice(ev.id, { participant: choice })}
+                      options={nondiverByEvent[ev.id]}
+                      event={ev}
+                    />
+                  )}
                 </li>
               ))}
               {cart.length === 0 && (
@@ -666,7 +712,7 @@ export function MultiRegisterForm({ events, profile, userId, onClose, onAllBooke
             <div className="space-y-3">
               {cart.map(ev => {
                 const c = choicesById[ev.id]
-                const gearPacksASet = packsAGearSet(ev)
+                const gearPacksASet = packsSetFor(ev)
                 const showGearRentChoice = !ev.gear_included
                 const transportSurcharge = ev.transport_price ?? 0
                 const transportIncluded = transportSurcharge <= 0

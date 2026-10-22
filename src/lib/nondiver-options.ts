@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { NondiverOption, NondiverOptionInsert } from '../types/database'
+import type { BookingDetails, NondiverOption, NondiverOptionInsert } from '../types/database'
 
 /**
  * Non-diver options: registering for an event without diving.
@@ -82,4 +82,38 @@ export async function fetchNondiverOptionsForEvent(eventId: string): Promise<Non
     .from('nondiver_options').select('*').in('id', ids).eq('active', true)
   if (error) throw error
   return sortNondiverOptions((Array.isArray(data) ? data : []) as NondiverOption[])
+}
+
+/**
+ * The options to show when an admin edits an existing booking: what the event
+ * offers now, plus the option this booking was made under if it has since been
+ * retired or taken off the event. Without it the form would find no match,
+ * fall back to the diver price, and saving would silently turn a snorkeler
+ * into a diver.
+ *
+ * The booked option is re-read from the catalog when it still exists. If it
+ * was deleted outright, it is rebuilt from the booking's own snapshot: its
+ * label, and the fee its base charge line froze. Its deposit cannot be
+ * recovered, so it edits as no deposit.
+ */
+export async function fetchNondiverOptionsForBooking(
+  eventId: string,
+  booked: Pick<BookingDetails, 'nondiver_option' | 'charges'> | undefined,
+): Promise<NondiverOption[]> {
+  const offered = await fetchNondiverOptionsForEvent(eventId)
+  const ref = booked?.nondiver_option
+  if (!ref || offered.some(o => o.id === ref.id)) return offered
+  const { data } = await supabase.from('nondiver_options').select('*').eq('id', ref.id).maybeSingle()
+  const kept: NondiverOption = (data as NondiverOption | null) ?? {
+    id: ref.id,
+    created_at: '',
+    created_by: null,
+    label: ref.label,
+    description: null,
+    price: booked?.charges?.find(c => c.kind === 'base')?.amount ?? 0,
+    deposit_amount: null,
+    active: false,
+    sort_order: 0,
+  }
+  return [...offered, kept]
 }

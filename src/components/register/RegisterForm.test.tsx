@@ -2599,6 +2599,70 @@ describe('RegisterForm', () => {
       expect(details.total).toBe(2800)
     })
 
+    it('packs no bundled scuba set for a non-diver on a gear-included event', async () => {
+      setupWithOption()
+      const user = userEvent.setup()
+      render(
+        <RegisterForm event={noExtrasEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} />
+      )
+      await user.click(await screen.findByLabelText(/snorkeler/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      // No "gear is included" note: the set is scuba kit, and they are not diving.
+      await screen.findByLabelText(/ride with the shop/i)
+      expect(screen.queryByText(/gear is included with this event/i)).not.toBeInTheDocument()
+      await user.click(screen.getByLabelText(/no, i don't need a ride/i))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /confirm booking/i }))
+      await waitFor(() => expect(invoke).toHaveBeenCalledOnce())
+      const details = (invoke.mock.calls[0][1] as { body: { details: BookingDetails } }).body.details
+      expect(details.gear).toEqual({ rent: false })
+      expect(details.total).toBe(1500)
+    })
+
+    it('in edit mode keeps an option the event no longer offers, at the fee it was booked at', async () => {
+      // Taken off the event and deleted from the catalog since this booking.
+      from.mockImplementation((table: string) => {
+        if (table === 'payment_methods')        return mockQueryBuilder({ data: PAYMENT_METHOD_ROWS })
+        if (table === 'event_nondiver_options') return mockQueryBuilder({ data: [] })
+        if (table === 'nondiver_options')       return mockQueryBuilder({ data: null })
+        if (table === 'bookings') {
+          return {
+            ...mockQueryBuilder(),
+            update: (...a: unknown[]) => {
+              update(...a)
+              return { eq: () => ({ select: () => ({ single: () => Promise.resolve({ data: { id: 'b1' }, error: null }) }) }) }
+            },
+          }
+        }
+        return mockQueryBuilder()
+      })
+      const user = userEvent.setup()
+      const existing = {
+        id: 'b1', user_id: 'u1', status: 'pending', notes: null,
+        details: {
+          gear: { rent: false }, add_ons: [], transportation: false, payment_method: 'cash',
+          nondiver_option: { id: 'nd-old', label: 'Boat ride' },
+          charges: [{ kind: 'base', label: 'Non-diver: Boat ride', amount: 900 }],
+          total: 900,
+        },
+      } as unknown as Parameters<typeof RegisterForm>[0]['existingBooking']
+      render(
+        <RegisterForm event={noExtrasEvent} profile={sampleProfile} userId="u1"
+          onClose={() => {}} onBooked={() => {}} existingBooking={existing} />
+      )
+      expect(await screen.findByLabelText(/boat ride/i)).toBeChecked()
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /next/i }))
+      await user.click(screen.getByRole('button', { name: /save changes/i }))
+      await waitFor(() => expect(update).toHaveBeenCalledOnce())
+      const details = (update.mock.calls[0][0] as { details: BookingDetails }).details
+      expect(details.nondiver_option).toEqual({ id: 'nd-old', label: 'Boat ride' })
+      expect(details.total).toBe(900)
+    })
+
     it('puts no choice on an event that offers no options', async () => {
       setupFrom()
       render(

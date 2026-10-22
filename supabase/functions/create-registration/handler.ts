@@ -436,7 +436,8 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     // billing them the diver fee would be a different booking from the one
     // they made.
     const nondiverId = (d.nondiver_option as { id?: unknown } | undefined)?.id
-    if (typeof nondiverId === "string" && nondiverId.length > 0) {
+    const isNondiver = typeof nondiverId === "string" && nondiverId.length > 0
+    if (isNondiver) {
       const { data: link } = await admin
         .from("event_nondiver_options").select("option_id")
         .eq("event_id", body.event_id).eq("option_id", nondiverId).maybeSingle()
@@ -478,8 +479,12 @@ export async function handleRegistration(req: Request, deps: Deps): Promise<Resp
     // Overwrite rather than trust the body, exactly as the ride answer above:
     // a crafted `gear.rent` with items would otherwise bill a diver for a set
     // the course fee already covers, and put that set on the packing list twice.
+    //
+    // A non-diver on such an event gets no bundled set: the set is scuba kit
+    // (BCD, regulator, computer), and recording it as included would put one
+    // on the logistics board's packing list for someone who never dives.
     if ((evMoney as { gear_included?: boolean } | null)?.gear_included === true) {
-      d.gear = { rent: false, included: true }
+      d.gear = isNondiver ? { rent: false } : { rent: false, included: true }
     }
 
     const gear = d.gear as { rent?: boolean; items?: string[] } | undefined

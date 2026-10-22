@@ -905,6 +905,16 @@ describe('handleRegistration — email behavior', () => {
       expect(captured.bookingInsert).toHaveLength(0)
     })
 
+    it('records no bundled scuba set for a non-diver on a gear-included event', async () => {
+      const { deps, captured } = makeDeps({
+        eventPriceId: 'p1', priceStartingAt: 3200, eventGearIncluded: true,
+        nondiverLinked: true, nondiverOption: snorkeler,
+      })
+      await register(deps, { nondiver_option: { id: 'nd1' }, gear: { rent: false, included: true } })
+      const details = captured.bookingInsert[0].details as { gear: unknown }
+      expect(details.gear).toEqual({ rent: false })
+    })
+
     it('prices a booking without an option as a diver and stores no option', async () => {
       const { deps, captured } = makeDeps({ eventPriceId: 'p1', priceStartingAt: 3200 })
       await register(deps, { nondiver_option: { label: 'Snorkeler' } })

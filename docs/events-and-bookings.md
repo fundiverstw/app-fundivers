@@ -201,6 +201,11 @@ while a child snorkels. The choice replaces two figures and nothing else:
 
 The rest of the form is unchanged: a non-diver is asked about gear, room,
 add-ons and the ride exactly as a diver is, and billed for what they pick.
+The one exception is a gear-included event (Discover Scuba, Open Water):
+the bundled set is scuba kit, so a non-diver gets none. The form asks no
+size for it and records `gear: { rent: false }` rather than
+`{ included: true }`, and `create-registration` forces the same, so the
+logistics board packs nothing for them.
 
 The booking records the choice as `details.nondiver_option = { id, label }`
 and the base charge line reads "Non-diver: <label>". `create-registration`
@@ -209,9 +214,14 @@ booking (422) otherwise, rather than quietly pricing the person as a diver —
 and takes the price, deposit and label from the catalog, never from the
 request. The admin event page shows the option on the person's card.
 
-The multi-event form (`MultiRegisterForm`) does not offer the choice, for
-the same reason it skips rooms and add-ons; a non-diver books that event on
-its own.
+The multi-event cart (`MultiRegisterForm`) offers the same choice on each
+cart row whose event offers options, priced and recorded the same way.
+
+An admin editing a booking keeps the option it was made under even after
+the event stops offering it (`fetchNondiverOptionsForBooking`): the option
+is re-read from the catalog, or, if it was deleted, rebuilt from the
+booking's label and frozen base charge. Without that, the form would find no
+match and saving would re-price the person as a diver.
 
 ### Price composition
 
