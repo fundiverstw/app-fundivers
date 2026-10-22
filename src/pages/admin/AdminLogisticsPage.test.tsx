@@ -558,7 +558,7 @@ describe('AdminLogisticsPage — people', () => {
     // Bo does both — which makes Bo a diver, counted once.
     fetchEventsInRange.mockResolvedValue([
       diveEvent,
-      { id: 'e2', type: 'course', title: 'EFR refresher', has_transport: false, enters_water: false, start_time: '2026-06-18T00:00:00Z', end_time: null },
+      { id: 'e2', type: 'course', title: 'EFR refresher', has_transport: false, involves_scuba: false, start_time: '2026-06-18T00:00:00Z', end_time: null },
     ])
     mockDay({
       bookingRows: [

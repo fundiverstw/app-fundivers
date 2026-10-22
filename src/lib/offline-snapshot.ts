@@ -10,7 +10,7 @@ import type { Profile, Vehicle } from '../types/database'
 /** Bumped when the stored shape changes. A snapshot from an older build is
  *  discarded rather than migrated — it is a cache, and the next sync refills
  *  it in seconds. */
-export const SNAPSHOT_VERSION = 1
+export const SNAPSHOT_VERSION = 2
 
 export interface OfflineSnapshot {
   version: number

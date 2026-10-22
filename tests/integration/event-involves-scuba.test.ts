@@ -1,5 +1,5 @@
 // The logistics board's diver / non-diver split is only as good as the column
-// behind it, and the failure mode is silent: `enters_water` missing from the
+// behind it, and the failure mode is silent: `involves_scuba` missing from the
 // event read (EVENT_COLS in src/lib/events.ts) falls back to `?? true`, so a
 // no-scuba EFR class comes back claiming its students were diving — a confident,
 // plausible, wrong answer, and exactly the one the shop's insurer is asking
@@ -19,9 +19,9 @@ const admin = adminClient()
 const DAY = '2031-11-04'
 
 let adminUser: TestUser
-let wetDive: string
-let dryCourse: string
-let wetCourse: string
+let scubaDive: string
+let noScubaCourse: string
+let scubaCourse: string
 
 async function createEvent(row: Record<string, unknown>): Promise<string> {
   const id = crypto.randomUUID()
@@ -32,15 +32,15 @@ async function createEvent(row: Record<string, unknown>): Promise<string> {
 
 beforeAll(async () => {
   adminUser = await createTestUser(admin, { role: 'admin' })
-  wetDive = await createEvent({
+  scubaDive = await createEvent({
     kind: 'dive', admin_title: 'Water split dive', notes: '',
     start_date: DAY, end_date: DAY, start_time: '08:00:00',
   })
-  dryCourse = await createEvent({
+  noScubaCourse = await createEvent({
     kind: 'course', display_title: 'Water split EFR', start_time: '09:00:00',
-    course_days: [DAY], enters_water: false,
+    course_days: [DAY], involves_scuba: false,
   })
-  wetCourse = await createEvent({
+  scubaCourse = await createEvent({
     kind: 'course', display_title: 'Water split Open Water', start_time: '10:00:00',
     course_days: [DAY],
   })
@@ -53,17 +53,17 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await supabase.auth.signOut()
-  for (const id of [wetDive, dryCourse, wetCourse]) {
+  for (const id of [scubaDive, noScubaCourse, scubaCourse]) {
     if (id) await admin.from('events' as never).delete().eq('id', id)
   }
   if (adminUser) await deleteTestUser(admin, adminUser.id)
 })
 
-describe('events.enters_water', () => {
+describe('events.involves_scuba', () => {
   it('defaults to diving, so no event that already existed changes meaning', async () => {
     const { data } = await admin.from('events' as never)
-      .select('enters_water').eq('id', wetDive).single()
-    expect((data as { enters_water: boolean }).enters_water).toBe(true)
+      .select('involves_scuba').eq('id', scubaDive).single()
+    expect((data as { involves_scuba: boolean }).involves_scuba).toBe(true)
   })
 
   it('comes back from the app\'s own event read, per event', async () => {
@@ -73,9 +73,9 @@ describe('events.enters_water', () => {
       expect(ev, `event ${id} should be in the day's range`).toBeTruthy()
       return eventInvolvesScuba(ev!)
     }
-    expect(answer(wetDive)).toBe(true)
-    expect(answer(wetCourse)).toBe(true)
+    expect(answer(scubaDive)).toBe(true)
+    expect(answer(scubaCourse)).toBe(true)
     // The whole point: a course whose students never scuba dive.
-    expect(answer(dryCourse)).toBe(false)
+    expect(answer(noScubaCourse)).toBe(false)
   })
 })

@@ -1807,7 +1807,7 @@ export interface Database {
            *  EFR/CPR, an equipment class, a BBQ (20260922100000). The logistics
            *  board counts those registrants as non-divers. Means "no scuba",
            *  not "nobody gets wet": non-divers may still snorkel or swim. */
-          enters_water: boolean
+          involves_scuba: boolean
           is_boat_dive: boolean | null
           is_trip: boolean | null
           nitrox_required: boolean
@@ -1852,7 +1852,7 @@ export interface Database {
           course_days?: string[] | null
           is_private?: boolean
           has_transport?: boolean
-          enters_water?: boolean
+          involves_scuba?: boolean
           is_boat_dive?: boolean | null
           is_trip?: boolean | null
           nitrox_required?: boolean
@@ -3252,7 +3252,7 @@ export interface AppEvent {
    *  split the shop's insurer asks for. Ask it through `eventInvolvesScuba()` (src/lib/participants.ts) rather
    *  than reading it raw: an adventure answers no by kind, whatever the column
    *  says. */
-  enters_water: boolean
+  involves_scuba: boolean
   /**
    * Admin-set full-payment deadline (YYYY-MM-DD). When null the
    * registration form falls back to "7 days before start_date" — see

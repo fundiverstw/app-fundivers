@@ -1,5 +1,5 @@
 -- Local-only fixtures for the Logistics board's diver / non-diver split
--- (events.enters_water, 20260922100000). Runs after the other seeds on every
+-- (events.involves_scuba, 20260922100000). Runs after the other seeds on every
 -- `make reset` (supabase/config.toml's [db.seed] sql_paths). NEVER pushed to
 -- cloud — `make push` only ships migrations.
 --
@@ -7,21 +7,21 @@
 -- diving, because the migration deliberately refuses to guess a course's
 -- answer from its title. Here we ARE the shop, so we can say.
 
--- The dumped courses that are dry first-aid / classroom work. EFR students
--- and an Equipment class are on the roster all day and never get wet.
+-- The dumped courses that are first-aid / classroom work. EFR students
+-- and an Equipment class are on the roster all day and never scuba dive.
 update public.events
-   set enters_water = false
+   set involves_scuba = false
  where kind = 'course'
    and admin_title in ('EFR', 'Equip');
 
 -- A shop BBQ: the whole reason the column exists. Deliberately on the same day
 -- as the crowded test dive (test-users.sql, current_date + 14) so one board
--- shows both halves of the roster at once. enters_water is set explicitly even
+-- shows both halves of the roster at once. involves_scuba is set explicitly even
 -- though the kind already answers it — the row says what the app says.
 insert into public.events (
   id, kind, admin_title, display_title, calendar_title,
   start_date, start_time, end_date,
-  notes, capacity, enters_water
+  notes, capacity, involves_scuba
 ) values (
   'e0000000-0000-0000-0000-000000000003'::uuid, 'adventure',
   'Beach BBQ',
@@ -30,12 +30,12 @@ insert into public.events (
   current_date + 14,
   '16:00:00'::time,
   current_date + 14,
-  'Local dev fixture: a dry event, for the non-diver half of the logistics board.',
+  'Local dev fixture: a no-scuba event, for the non-diver half of the logistics board.',
   20, false
 ) on conflict (id) do nothing;
 
 -- Who is at the BBQ. Three who are there and nowhere else — the non-divers —
--- and one who dives the same morning, to exercise the rule that any in-water
+-- and one who dives the same morning, to exercise the rule that any scuba
 -- booking wins: they stay a diver, listed once.
 --
 --   diver@diver.diver      — no other booking that day

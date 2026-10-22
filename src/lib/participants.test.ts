@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { bookingIsDiver, dayRoster, eventInvolvesScuba, nondiverLabel } from './participants'
 import type { AppEvent, Booking, Profile } from '../types/database'
 
-const event = (type: AppEvent['type'], enters_water: boolean) =>
-  ({ type, enters_water }) as Pick<AppEvent, 'type' | 'enters_water'>
+const event = (type: AppEvent['type'], involves_scuba: boolean) =>
+  ({ type, involves_scuba }) as Pick<AppEvent, 'type' | 'involves_scuba'>
 
 const person = (id: string, name: string, bookingId = `b-${id}`) => ({
   booking: { id: bookingId } as unknown as Booking,
@@ -26,7 +26,7 @@ describe('eventInvolvesScuba', () => {
   it('treats a missing column as scuba, not as no-scuba', () => {
     // An offline snapshot captured before 20260922100000 carries no key; the
     // board must degrade to the answer it gave before, not empty its diver list.
-    expect(eventInvolvesScuba({ type: 'dive' } as Pick<AppEvent, 'type' | 'enters_water'>)).toBe(true)
+    expect(eventInvolvesScuba({ type: 'dive' } as Pick<AppEvent, 'type' | 'involves_scuba'>)).toBe(true)
   })
 })
 

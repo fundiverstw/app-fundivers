@@ -48,7 +48,7 @@ export interface FormState {
   // equipment course and a BBQ say no, and the logistics board then counts
   // them as non-divers (who may still snorkel or swim). An adventure answers
   // no by kind. False means "no scuba", not "nobody gets wet".
-  enters_water: boolean
+  involves_scuba: boolean
   cancel_date: string
   cancel_policy: string
   destinationIds: string[]   // FK multi → travel_destinations
@@ -78,7 +78,7 @@ export const EMPTY_FORM: FormState = {
   featured_image: '',
   notes: '', featured: false, fully_booked: false, is_private: false, is_boat_dive: false, is_trip: false,
   roomIds: [],
-  nitrox_required: false, gear_rental: '', gear_included: false, enters_water: true,
+  nitrox_required: false, gear_rental: '', gear_included: false, involves_scuba: true,
   cancel_date: '', cancel_policy: '',
   destinationIds: [], trip_template_reference: '',
   full_payment_deadline: '',
@@ -147,7 +147,7 @@ export function formStateFromEvent(e: EventRow, rels: EventRelations = NO_RELATI
     full_payment_deadline: e.full_payment_deadline ?? '',
     featured_image: e.featured_image ?? '',
     gear_included: e.gear_included ?? false,
-    enters_water: e.enters_water ?? true,
+    involves_scuba: e.involves_scuba ?? true,
   }
 
   if (usesCourseDays(e.kind)) {
@@ -244,7 +244,7 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     // Unreachable on an adventure rather than merely unticked: the kind
     // already says nobody scuba dives, so the form offers no box and the row
     // says the same thing the app does — see eventInvolvesScuba().
-    enters_water: kindInvolvesScuba(form.type) ? form.enters_water : false,
+    involves_scuba: kindInvolvesScuba(form.type) ? form.involves_scuba : false,
     trip_template_id: courseOnly ? null : (form.trip_template_reference || null),
     // course-only
     course_name: courseOnly ? (form.course_name || null) : null,

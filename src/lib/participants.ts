@@ -9,20 +9,19 @@ import type { AppEvent, Booking, Profile } from '../types/database'
  * get wet and is still a non-diver; the shop's insurer counts scuba divers.
  *
  * Two answers, and the stricter one wins. The kind answers first: an adventure
- * travels overland, so nothing it says in `enters_water` can make it a scuba
+ * travels overland, so nothing it says in `involves_scuba` can make it a scuba
  * event (see kindInvolvesScuba in event-kinds.ts). Only where the kind says
  * "maybe" — a dive, a course — does the admin's per-event answer decide,
  * because EFR, CPR and an equipment class are all kind='course' and nobody
- * scuba dives on them. (The column's name predates this wording; false means
- * "no scuba", not "nobody gets wet".)
+ * scuba dives on them.
  *
  * Compared against false rather than read as truthy: an offline snapshot taken
  * before the column existed (20260922100000) carries no key at all, and
  * treating undefined as "no scuba" would empty the day's diver list rather than
  * degrading to the behavior the board had before.
  */
-export function eventInvolvesScuba(event: Pick<AppEvent, 'type' | 'enters_water'>): boolean {
-  return kindInvolvesScuba(event.type) && event.enters_water !== false
+export function eventInvolvesScuba(event: Pick<AppEvent, 'type' | 'involves_scuba'>): boolean {
+  return kindInvolvesScuba(event.type) && event.involves_scuba !== false
 }
 
 /**
@@ -36,7 +35,7 @@ export function nondiverLabel(booking: Pick<Booking, 'details'>): string | null 
 
 /** Does this person scuba dive on this event? Event and booking both have to say yes. */
 export function bookingIsDiver(
-  event: Pick<AppEvent, 'type' | 'enters_water'>,
+  event: Pick<AppEvent, 'type' | 'involves_scuba'>,
   booking: Pick<Booking, 'details'>,
 ): boolean {
   return eventInvolvesScuba(event) && nondiverLabel(booking) === null

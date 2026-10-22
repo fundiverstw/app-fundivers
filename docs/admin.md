@@ -130,8 +130,7 @@ water: to snorkel, to swim off the boat.
 The kind cannot answer it — an EFR course and an Open Water course are
 both `kind='course'` — so the event form asks the admin instead
 (**Participants → "No scuba diving at this event"**, writing
-`events.enters_water`; the column name predates the wording, and false
-means "no scuba", not "nobody gets wet"). `eventInvolvesScuba()` in
+`events.involves_scuba`; renamed from `enters_water` in 20261022100000). `eventInvolvesScuba()` in
 `src/lib/participants.ts` is the only place that answer is read: it ANDs
 the column with `kindInvolvesScuba(kind)`, so an adventure is never a
 scuba event whatever the column says, and a snapshot captured before the column

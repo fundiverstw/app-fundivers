@@ -975,8 +975,8 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
       {kindInvolvesScuba(form.type) && (
         <Section title={ef.sectionParticipants}>
           <Checkbox
-            checked={!form.enters_water}
-            onChange={v => set('enters_water', !v)}
+            checked={!form.involves_scuba}
+            onChange={v => set('involves_scuba', !v)}
             label={ef.noScubaEvent}
           />
           <p className="text-xs text-white/70">{ef.noScubaEventHint}</p>
