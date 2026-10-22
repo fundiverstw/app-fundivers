@@ -119,33 +119,37 @@ matching the Taiwanese recreational-fishing-vessel passenger form
 
 ## Divers and non-divers
 
-Not everyone on a day's board is diving. EFR and CPR students, an
-equipment class and a beach BBQ all put people on the roster who never
-get wet, and the shop's insurer asks for exactly that split: of the
-people you signed up that day, how many were in the water?
+Not everyone on a day's board is scuba diving. EFR and CPR students, an
+equipment class, a beach BBQ and a snorkeler all put people on the roster
+who do not scuba dive, and the shop's insurer asks for exactly that split:
+of the people you signed up that day, how many were scuba diving?
+
+"Non-diver" means only "not scuba diving". A non-diver may still go in the
+water: to snorkel, to swim off the boat.
 
 The kind cannot answer it — an EFR course and an Open Water course are
 both `kind='course'` — so the event form asks the admin instead
-(**Participants → "Nobody goes in the water at this event"**, writing
-`events.enters_water`). `eventEntersWater()` in
+(**Participants → "No scuba diving at this event"**, writing
+`events.enters_water`; the column name predates the wording, and false
+means "no scuba", not "nobody gets wet"). `eventInvolvesScuba()` in
 `src/lib/participants.ts` is the only place that answer is read: it ANDs
-the column with `entersTheWater(kind)`, so an adventure stays dry
-whatever the column says, and a snapshot captured before the column
+the column with `kindInvolvesScuba(kind)`, so an adventure is never a
+scuba event whatever the column says, and a snapshot captured before the column
 existed degrades to "diving" rather than emptying the diver list.
 
 The board's **People** section counts both at the top — "2 events · 20
-divers · 3 non-divers" — and lists each event's guests under it, a dry
+divers · 3 non-divers" — and lists each event's guests under it, a no-scuba
 event's on orange chips. The count is a question about the *person*, not
 the booking: somebody who takes the morning EFR class and dives in the
-afternoon is one diver, because any in-water booking wins. Each dry event
-also carries a "Dry — nobody in the water" badge on its banner and counts
-non-divers rather than divers there.
+afternoon is one diver, because any scuba booking wins. Each no-scuba
+event also carries a "No scuba" badge on its banner and counts non-divers
+rather than divers there.
 
 The split is per person as well as per event: somebody who registered on a
-diving event under a non-diver option (a snorkeler, a boat passenger — see
+scuba event under a non-diver option (a snorkeler, a boat passenger — see
 [events-and-bookings.md § Non-diver options](./events-and-bookings.md#non-diver-options))
-is a non-diver too. `bookingEntersWater()` in `src/lib/participants.ts`
-answers it. On the board they get the same orange as a dry event: their own
+is a non-diver too. `bookingIsDiver()` in `src/lib/participants.ts`
+answers it. On the board they get the same orange as a no-scuba event: their own
 **Non-divers** group under the event, a chip reading "Bo · Snorkeler", a
 "1 diver · 1 non-diver" banner, and a "Non-diver · Snorkeler" pill on their
 gear card, since they may still rent fins or a wetsuit.

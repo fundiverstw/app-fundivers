@@ -552,7 +552,7 @@ describe('AdminLogisticsPage — people', () => {
     expect(within(green).queryByText('Bo')).not.toBeInTheDocument()
   })
 
-  it('lists a dry event\'s registrants as non-divers, apart from the divers', async () => {
+  it('lists a no-scuba event\'s registrants as non-divers, apart from the divers', async () => {
     const user = userEvent.setup()
     // An EFR class and a fun dive on the same day: Ada dives, Cy does not, and
     // Bo does both — which makes Bo a diver, counted once.
@@ -573,10 +573,10 @@ describe('AdminLogisticsPage — people', () => {
     const people = await openSection(user, /^people/i)
 
     expect(within(people).getByText(/2 events · 2 divers/i)).toHaveTextContent(/1 non-diver/i)
-    const dry = within(people).getByRole('group', { name: t.admin.logistics.nonDiversOnDay })
-    expect(within(dry).getByText('Cy')).toBeInTheDocument()
-    expect(within(dry).getByText('Bo')).toBeInTheDocument()
-    expect(within(people).getByText(t.admin.logistics.dryEventBadge)).toBeInTheDocument()
+    const nonDivers = within(people).getByRole('group', { name: t.admin.logistics.nonDiversOnDay })
+    expect(within(nonDivers).getByText('Cy')).toBeInTheDocument()
+    expect(within(nonDivers).getByText('Bo')).toBeInTheDocument()
+    expect(within(people).getByText(t.admin.logistics.noScubaBadge)).toBeInTheDocument()
   })
 
   it('marks someone on a non-diver option as a non-diver on a diving event', async () => {

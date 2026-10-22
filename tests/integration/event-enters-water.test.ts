@@ -1,7 +1,7 @@
 // The logistics board's diver / non-diver split is only as good as the column
 // behind it, and the failure mode is silent: `enters_water` missing from the
 // event read (EVENT_COLS in src/lib/events.ts) falls back to `?? true`, so a
-// dry EFR class comes back claiming its students were diving — a confident,
+// no-scuba EFR class comes back claiming its students were diving — a confident,
 // plausible, wrong answer, and exactly the one the shop's insurer is asking
 // about.
 //
@@ -12,7 +12,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest'
 import { adminClient, userClient, createTestUser, deleteTestUser, type TestUser } from './helpers'
 import { supabase } from '../../src/lib/supabase'
 import { fetchEventsInRange } from '../../src/lib/events'
-import { eventEntersWater } from '../../src/lib/participants'
+import { eventInvolvesScuba } from '../../src/lib/participants'
 
 const admin = adminClient()
 
@@ -71,11 +71,11 @@ describe('events.enters_water', () => {
     const answer = (id: string) => {
       const ev = events.find(e => e.id === id)
       expect(ev, `event ${id} should be in the day's range`).toBeTruthy()
-      return eventEntersWater(ev!)
+      return eventInvolvesScuba(ev!)
     }
     expect(answer(wetDive)).toBe(true)
     expect(answer(wetCourse)).toBe(true)
-    // The whole point: a course whose students never get wet.
+    // The whole point: a course whose students never scuba dive.
     expect(answer(dryCourse)).toBe(false)
   })
 })

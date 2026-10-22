@@ -12,7 +12,7 @@ import {
   type FormState,
 } from './event-form-state'
 import { DateField } from '../DateField'
-import { usesCourseDays, usesDateEnvelope, hasDiveFlags, recordsSiteConditions, entersTheWater } from '../../lib/event-kinds'
+import { usesCourseDays, usesDateEnvelope, hasDiveFlags, recordsSiteConditions, kindInvolvesScuba } from '../../lib/event-kinds'
 import { EVENT_KIND_LABELS } from '../../lib/event-kind-labels'
 import { EVENT_KINDS } from '../../types/database'
 import { DATE_ENVELOPE_KINDS, COURSE_DAY_KINDS } from '../../lib/event-kinds'
@@ -972,14 +972,14 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           insurer behind it. Offered only where the kind leaves the question
           open: an adventure never enters the water whatever is ticked here,
           so it gets no box (eventPayloadFromForm writes false for it). */}
-      {entersTheWater(form.type) && (
+      {kindInvolvesScuba(form.type) && (
         <Section title={ef.sectionParticipants}>
           <Checkbox
             checked={!form.enters_water}
             onChange={v => set('enters_water', !v)}
-            label={ef.dryEvent}
+            label={ef.noScubaEvent}
           />
-          <p className="text-xs text-white/70">{ef.dryEventHint}</p>
+          <p className="text-xs text-white/70">{ef.noScubaEventHint}</p>
         </Section>
       )}
 

@@ -1,5 +1,5 @@
 import type { EventRow, EventKind } from '../../types/database'
-import { usesDateEnvelope, usesCourseDays, hasDiveFlags, recordsSiteConditions, entersTheWater } from '../../lib/event-kinds'
+import { usesDateEnvelope, usesCourseDays, hasDiveFlags, recordsSiteConditions, kindInvolvesScuba } from '../../lib/event-kinds'
 
 // Form-state shape, defaults, prefill helpers, and the FormState→DB-payload
 // converters used by the create + edit pages. Lives in its own file so the
@@ -44,9 +44,10 @@ export interface FormState {
   gear_rental: string
   // Every kind: no gear question at registration, no gear in the price.
   gear_included: boolean
-  // Dive + course: do the people who register actually get in the water? An
-  // EFR class, an equipment course and a BBQ say no, and the logistics board
-  // then counts them as non-divers. An adventure answers no by kind.
+  // Dive + course: does anyone who registers scuba dive? An EFR class, an
+  // equipment course and a BBQ say no, and the logistics board then counts
+  // them as non-divers (who may still snorkel or swim). An adventure answers
+  // no by kind. False means "no scuba", not "nobody gets wet".
   enters_water: boolean
   cancel_date: string
   cancel_policy: string
@@ -237,13 +238,13 @@ export function eventPayloadFromForm(form: FormState): Record<string, unknown> {
     notes: courseOnly ? null : form.notes,
     nitrox_required: diving ? form.nitrox_required : false,
     gear_rental: courseOnly ? null : (form.gear_rental || null),
-    // Every kind answers this one: a course bundles a set, a dry course or a
-    // non-diving outing needs none, a fun dive rents a-la-carte.
+    // Every kind answers this one: a course bundles a set, a classroom course
+    // or a non-scuba outing needs none, a fun dive rents a-la-carte.
     gear_included: form.gear_included,
     // Unreachable on an adventure rather than merely unticked: the kind
-    // already says nobody goes under, so the form offers no box and the row
-    // says the same thing the app does — see eventEntersWater().
-    enters_water: entersTheWater(form.type) ? form.enters_water : false,
+    // already says nobody scuba dives, so the form offers no box and the row
+    // says the same thing the app does — see eventInvolvesScuba().
+    enters_water: kindInvolvesScuba(form.type) ? form.enters_water : false,
     trip_template_id: courseOnly ? null : (form.trip_template_reference || null),
     // course-only
     course_name: courseOnly ? (form.course_name || null) : null,

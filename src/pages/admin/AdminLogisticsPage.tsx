@@ -5,7 +5,7 @@ import { format, parseISO } from 'date-fns'
 import { siteConfig } from '../../config/site'
 import { fetchUpcomingEventDays, formatEventSpan } from '../../lib/events'
 import { splitByTransport, transportHeadcount, dayKeyOffset, partitionByWaitlist } from '../../lib/logistics'
-import { bookingEntersWater, dayRoster, eventEntersWater, nondiverLabel } from '../../lib/participants'
+import { bookingIsDiver, dayRoster, eventInvolvesScuba, nondiverLabel } from '../../lib/participants'
 import { guestPieces, packProgress, piecesByItem, type PackGuest, type PackPiece } from '../../lib/pack-list'
 import { gearPackList } from '../../lib/gear'
 import { bookingBalance, type BookingBalance } from '../../lib/booking-balance'
@@ -51,8 +51,9 @@ interface BookingBalanceRow { bal: BookingBalance; payerName: string | null }
 // flipping the text to near-white, so the outline would vanish.
 const NAME_CHIP =
   'text-sm px-2.5 py-1 rounded-full border border-white/20 bg-white/5 text-brand-50 font-medium'
-// Someone on a dry event — orange, so the people who never get in the water
-// can be counted at a glance; that count is what the shop's insurer asks for.
+// A non-diver — orange, so the people who are not scuba diving (they may
+// still snorkel or swim) can be counted at a glance; that count is what the
+// shop's insurer asks for.
 const NON_DIVER_CHIP =
   'text-sm px-2.5 py-1 rounded-full border border-orange-400/40 bg-orange-500/10 text-orange-100 font-medium'
 // No seat yet — violet, the waitlist tone everywhere on the board.
@@ -394,14 +395,14 @@ export function AdminLogisticsPage() {
   // Day-wide on-duty staff, one entry per person even across several events.
   const dayStaffIds = new Set((groups ?? []).flatMap(g => g.staff).map(s => s.profile?.id ?? s.dutyId))
   const onDutyStaffCount = dayStaffIds.size
-  // The day's roster, one entry per person, split by whether they actually
-  // get in the water. "How many of them were diving" is the question the
-  // shop's insurer asks, so dry-event registrants are not called divers.
+  // The day's roster, one entry per person, split by whether they scuba
+  // dive. "How many of them were scuba diving" is the question the shop's
+  // insurer asks, so registrants on a no-scuba event are not called divers.
   const seatedRoster = dayRoster(
-    (groups ?? []).map(g => ({ entersWater: eventEntersWater(g.event), rows: partitionByWaitlist(g.rows).seated })),
+    (groups ?? []).map(g => ({ involvesScuba: eventInvolvesScuba(g.event), rows: partitionByWaitlist(g.rows).seated })),
     tp.noProfile,
   )
-  const dayDiverCount = seatedRoster.filter(p => p.inWater).length
+  const dayDiverCount = seatedRoster.filter(p => p.isDiver).length
   const dayNonDiverCount = seatedRoster.length - dayDiverCount
   // Divers who still owe — for the whole-day summary and each event's list.
   const currency = (groups ?? [])[0]?.event.currency ?? siteConfig.locale.currency
@@ -703,11 +704,12 @@ export function AdminLogisticsPage() {
               </div>
               {groups.map(g => {
                 const { seated, waitlisted } = partitionByWaitlist(g.rows)
-                // Who gets in the water, person by person: a dry event puts
-                // nobody in, and on a wet one anyone who registered under a
-                // non-diver option (a snorkeler, a boat passenger) stays out.
-                const divers = seated.filter(r => bookingEntersWater(g.event, r.booking))
-                const nonDivers = seated.filter(r => !bookingEntersWater(g.event, r.booking))
+                // Who scuba dives, person by person: on a no-scuba event
+                // nobody does, and on a scuba event anyone who registered
+                // under a non-diver option (a snorkeler, a boat passenger)
+                // does not.
+                const divers = seated.filter(r => bookingIsDiver(g.event, r.booking))
+                const nonDivers = seated.filter(r => !bookingIsDiver(g.event, r.booking))
                 const chip = (r: DiverGearRow, className: string) => {
                   const name = personName(r.profile?.name) || tp.noProfile
                   const option = nondiverLabel(r.booking)
@@ -944,7 +946,7 @@ function EventBanner({ event, headcount, nondivers, isAdmin }: {
   nondivers: number
   isAdmin: boolean
 }) {
-  const dry = !eventEntersWater(event)
+  const noScuba = !eventInvolvesScuba(event)
   return (
     <div className="bg-brand-900 text-white rounded-xl px-4 py-2.5 space-y-0.5">
       <div className="flex items-start justify-between gap-3">
@@ -964,16 +966,16 @@ function EventBanner({ event, headcount, nondivers, isAdmin }: {
       </div>
       <span className="block text-xs text-white/80">
         {formatEventSpan(event, { style: 'compact' })}
-        {' · '}{dry
+        {' · '}{noScuba
           ? lg.nonDiverCount(headcount)
           : <>
               {lg.diverCount(headcount - nondivers)}
               {nondivers > 0 && <> · <span className="text-orange-200 font-semibold">{lg.nonDiverCount(nondivers)}</span></>}
             </>}
       </span>
-      {dry && (
+      {noScuba && (
         <span className="inline-block text-[11px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border border-orange-300/60 bg-orange-500/20 text-orange-100">
-          {lg.dryEventBadge}
+          {lg.noScubaBadge}
         </span>
       )}
     </div>

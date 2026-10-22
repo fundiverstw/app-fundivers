@@ -145,8 +145,8 @@ hasn't already got one.
 Whether a gear question is put at all is one admin-set column,
 `events.gear_included`, ticked on the event form. Ticked means the diver
 is neither asked nor billed for gear: the fee already covers a set (Open
-Water, Discover Scuba) or nothing goes in the water (a dry course, a
-non-diving outing). Nothing infers it — the substring match on course
+Water, Discover Scuba) or nobody scuba dives (a classroom course, a
+non-scuba outing). Nothing infers it — the substring match on course
 titles that used to decide this at registration time now survives only
 as `suggestsGearIncluded()` in `src/lib/gear.ts`, which pre-ticks the box
 on the event form and can be overruled. The edge function re-reads the
@@ -157,7 +157,7 @@ ride answer, so a crafted body cannot buy gear the event does not sell.
 Two events answer it the same way and want opposite things from the
 logistics board: a Discover Scuba bundles a full set that still has to
 fit somebody, a hike needs none. `packsAGearSet()` separates them on
-`entersTheWater()` — an event that dives records
+`kindInvolvesScuba()` — an event that dives records
 `gear: { rent: false, included: true }` and has `FULL_GEAR_SET` packed;
 an overland outing records plain `{ rent: false }` and nothing is packed.
 Deliberately a question about the kind, not about `dive_days`: that

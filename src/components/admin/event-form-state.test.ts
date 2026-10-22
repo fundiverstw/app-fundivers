@@ -634,10 +634,10 @@ describe('adventure events', () => {
     expect(payload.notes).toBe('bring a tent')
   })
 
-  it('writes an adventure as dry however the form was left', () => {
-    // The kind travels overland, so the form offers no water box at all. The
+  it('writes an adventure as no-scuba however the form was left', () => {
+    // The kind travels overland, so the form offers no scuba box at all. The
     // row says the same thing the app does rather than carrying a true that
-    // eventEntersWater() would have to keep overruling.
+    // eventInvolvesScuba() would have to keep overruling.
     const payload = eventPayloadFromForm({
       ...EMPTY_FORM, type: 'adventure', start_date: '2026-08-01',
       admin_title: 'Camping weekend', enters_water: true,

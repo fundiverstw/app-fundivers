@@ -1,6 +1,6 @@
 import type { AppEvent, Booking } from '../types/database'
 import { siteConfig } from '../config/site'
-import { entersTheWater, hasDiveFlags, usesCourseDays, type EventKind } from './event-kinds'
+import { kindInvolvesScuba, hasDiveFlags, usesCourseDays, type EventKind } from './event-kinds'
 
 // Canonical list of gear items, set per shop in fundive.config.ts. This is the
 // catalog a diver describes themselves against — the profile's "Gear I own"
@@ -158,8 +158,8 @@ export const FULL_GEAR_SET = defaultRentalItems([])
  * `gear_included` says only that the diver is neither asked nor billed for
  * gear, and that one answer covers events wanting opposite things from the
  * logistics board: a Discover Scuba fee covers a full set that still has to
- * fit somebody, while a non-diving outing covers nothing because nothing goes
- * in the water. `entersTheWater` is what separates them.
+ * fit somebody, while a non-scuba outing covers nothing because nobody scuba
+ * dives. `kindInvolvesScuba` is what separates them.
  *
  * Deliberately a question about the KIND rather than about `dive_days`, which
  * would read as the better signal and is not: the column is optional, and the
@@ -167,7 +167,7 @@ export const FULL_GEAR_SET = defaultRentalItems([])
  * quietly stopped putting a set on the van for the very students who own none.
  */
 export function packsAGearSet(event: Pick<AppEvent, 'gear_included' | 'type'>): boolean {
-  return event.gear_included && entersTheWater(event.type)
+  return event.gear_included && kindInvolvesScuba(event.type)
 }
 
 /**
@@ -182,7 +182,7 @@ export function packsAGearSet(event: Pick<AppEvent, 'gear_included' | 'type'>): 
  * it stands.
  *
  * Open Water and Discover Scuba (DSD / "Try Dive") bundle a full set into the
- * fee, because those divers own nothing yet. EFR is a dry first-aid course.
+ * fee, because those divers own nothing yet. EFR is a classroom first-aid course.
  * An adventure is not a dive. Every other course — Advanced Open Water, EANx,
  * Deep, Rescue, Equipment — is for already-certified divers who rent like a
  * fun diver, so they are left alone.

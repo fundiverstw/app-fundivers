@@ -2511,11 +2511,11 @@ export const en = {
       isPrivate: 'Private (hidden from public calendars)',
       gearRental: 'Gear rental info',
       sectionParticipants: 'Participants',
-      dryEvent: 'Nobody goes in the water at this event',
-      dryEventHint: 'Tick for an EFR or CPR class, an equipment course, a BBQ. The logistics board then lists these registrants as non-divers instead of divers, which is the split the shop\'s insurer asks for.',
+      noScubaEvent: 'No scuba diving at this event',
+      noScubaEventHint: 'Tick when nobody registered scuba dives: an EFR or CPR class, an equipment course, a BBQ, a snorkel trip. The logistics board then lists these registrants as non-divers instead of divers, which is the split the shop\'s insurer asks for. Non-divers may still swim or snorkel.',
       sectionGear: 'Gear',
       gearIncluded: 'Gear included — no gear options at registration',
-      gearIncludedHint: 'Tick when the fee already covers a set (Open Water, Discover Scuba) or nothing goes in the water. Divers are asked no gear question and no gear reaches the price, the invoice or the PDF.',
+      gearIncludedHint: 'Tick when the fee already covers a set (Open Water, Discover Scuba) or nobody scuba dives. Divers are asked no gear question and no gear reaches the price, the invoice or the PDF.',
       gearIncludedSuggestion: 'This usually includes gear. Tick the box unless divers rent separately for it.',
       featuredImage: 'Featured image (Wix URI)',
       destinations: 'Destinations',
@@ -2583,14 +2583,15 @@ export const en = {
         `${events} event${events === 1 ? '' : 's'} · ${divers} diver${divers === 1 ? '' : 's'}`,
       diverCount: (n: number) => `${n} diver${n === 1 ? '' : 's'}`,
       diversOnDay: 'Divers',
-      // The dry half of the roster — everybody the shop signed up that day
-      // who never gets in the water. Kept as its own block rather than a
-      // marker on a diver chip: the shop's insurer asks for the two counts.
+      // The non-scuba half of the roster — everybody the shop signed up that
+      // day who does not scuba dive (they may still snorkel or swim). Kept as
+      // its own block rather than a marker on a diver chip: the shop's
+      // insurer asks for the two counts.
       nonDiversOnDay: 'Non-divers',
       nonDiverCount: (n: number) => `${n} non-diver${n === 1 ? '' : 's'}`,
       nondiverTag: (label: string) => `Non-diver · ${label}`,
-      nonDiverHint: 'On the roster, not diving — EFR/CPR students, BBQ guests, and anyone who registered as a non-diver (a snorkeler, a boat passenger).',
-      dryEventBadge: 'Dry — nobody in the water',
+      nonDiverHint: 'On the roster, not scuba diving — EFR/CPR students, BBQ guests, and anyone who registered as a non-diver (a snorkeler, a boat passenger).',
+      noScubaBadge: 'No scuba',
       // Every name on the board's People section opens that person's directory card.
       viewProfile: (name: string) => `View ${name}'s profile`,
       // `where` is already localised: the "Tomorrow" tab label, or a date key.

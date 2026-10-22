@@ -1803,9 +1803,10 @@ export interface Database {
            *  held at the shop (20260821000000). The registration form then
            *  puts no ride question and the event takes no cars. */
           has_transport: boolean
-          /** False when nobody registered for this event goes in the water —
+          /** False when nobody registered for this event scuba dives —
            *  EFR/CPR, an equipment class, a BBQ (20260922100000). The logistics
-           *  board counts those registrants as non-divers. */
+           *  board counts those registrants as non-divers. Means "no scuba",
+           *  not "nobody gets wet": non-divers may still snorkel or swim. */
           enters_water: boolean
           is_boat_dive: boolean | null
           is_trip: boolean | null
@@ -3225,8 +3226,8 @@ export interface AppEvent {
    *  only — whether gear is offered at all is `gear_included`. */
   gear_rental_info: string | null
   /** Admin-set: the event asks no gear question and bills no gear, because the
-   *  fee already covers a set (Open Water, Discover Scuba) or nothing goes in
-   *  the water (a dry course, a non-diving outing). The register forms record
+   *  fee already covers a set (Open Water, Discover Scuba) or nobody scuba
+   *  dives (a classroom course, a non-scuba outing). The register forms record
    *  `gear: { rent: false, included: true }` for these and every price path
    *  scores gear at zero. */
   gear_included: boolean
@@ -3245,10 +3246,10 @@ export interface AppEvent {
    *  form then puts no ride question at all and no car is assigned. True for
    *  everything else, including the courses that do travel to open water. */
   has_transport: boolean
-  /** Admin-set: do this event's registrants go in the water? False for an
+  /** Admin-set: does anyone registered for this event scuba dive? False for an
    *  EFR/CPR class, an equipment course, a BBQ — the logistics board lists
-   *  those people as non-divers, which is the split the shop's insurer asks
-   *  for. Ask it through `eventEntersWater()` (src/lib/participants.ts) rather
+   *  those people as non-divers (who may still snorkel or swim), which is the
+   *  split the shop's insurer asks for. Ask it through `eventInvolvesScuba()` (src/lib/participants.ts) rather
    *  than reading it raw: an adventure answers no by kind, whatever the column
    *  says. */
   enters_water: boolean
