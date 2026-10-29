@@ -160,8 +160,9 @@ not cover a diver who asked for rubber — while sizing still resolves through
   3. Set `features.eventSharing: true`.
 
   If the toggle is off or `urls.eventPage` is unset, the button simply doesn't
-  render — no fallback, nothing breaks. FunDivers points this at a synced Wix
-  event page; that Wix wiring is FunDivers' own, not part of the app.
+  render — no fallback, nothing breaks. FunDivers points this at its marketing
+  site's `/events/{id}` page (site-fundivers), which reads the event from the
+  same database; that page is FunDivers' own, not part of the app.
 
 ## Versioning & pulling core updates
 
