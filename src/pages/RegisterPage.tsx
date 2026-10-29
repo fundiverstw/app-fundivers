@@ -18,9 +18,9 @@ import { EVENT_KIND_DOT, EVENT_KIND_LABELS } from '../lib/event-kind-labels'
 const rp = t.registerPage
 
 // Public standalone registration page. Two entry paths:
-//   /register                 → event picker (Wix home link, direct URL)
-//   /register/:id             → form pre-filled with that event (Wix calendar
-//                                deep-link, in-app event click)
+//   /register                 → event picker (public site link, direct URL)
+//   /register/:id             → form pre-filled with that event (public site
+//                                event page, in-app event click)
 //
 // Both render this component. When no event is in the URL we show the picker
 // framed as step 1 of the form; clicking an event navigates to the pre-filled

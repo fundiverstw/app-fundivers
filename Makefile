@@ -45,8 +45,6 @@ help:
 	@echo "  make deploy-app        — deploy just the SPA (app-fundiverstw)"
 	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
 	@echo "  make deploy-functions  — deploy all supabase edge functions in supabase/functions/"
-	@echo ""
-	@echo "Wix CMS (Supabase -> Wix):"
 
 # Guard for anything that reads or writes the LOCAL database.
 #

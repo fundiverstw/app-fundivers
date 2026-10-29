@@ -6,8 +6,8 @@ import {
 } from './helpers'
 
 // Pins the public read + admin-write RLS contract on cert_levels. Anyone
-// (anon or authenticated) can list certifications because the Wix
-// detail page + PWA register page both read them; only admins mutate.
+// (anon or authenticated) can list certifications because the public
+// site + PWA register page both read them; only admins mutate.
 
 const admin = adminClient()
 let adminUser: TestUser

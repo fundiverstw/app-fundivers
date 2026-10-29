@@ -1631,7 +1631,7 @@ export const zhTW: Messages = {
         slug: '網址代稱', slugPh: '公開網站使用的 URL slug',
         locationPicture: '地點圖片（URL）',
         backgroundPicture: '背景圖片（URL）',
-        picturePh: 'wix:image://… 或 https://…',
+        picturePh: '/imgs/media/….webp 或 https://…',
       },
     },
     terms: {
@@ -2479,7 +2479,8 @@ export const zhTW: Messages = {
       gearIncluded: '含裝備——報名時不提供裝備選項',
       gearIncludedHint: '當費用已含一整套裝備（開放水域、體驗潛水），或無人水肺潛水時勾選。潛水員不會看到裝備問題，價格、帳單與 PDF 也都不會計入裝備費。',
       gearIncludedSuggestion: '這類活動通常含裝備。除非潛水員需另行租借，否則請勾選。',
-      featuredImage: '精選圖片（Wix URI）',
+      featuredImage: '精選圖片',
+      featuredImagePh: '/imgs/media/….webp 或 Supabase Storage 的 https://…',
       destinations: '目的地',
       noDestinations: '尚未定義任何目的地。',
       newDestination: '+ 新增目的地',
@@ -2514,8 +2515,7 @@ export const zhTW: Messages = {
       newAddon: '+ 新增附加項目',
       newAddonTitle: '新增附加項目',
       saveAddon: '儲存附加項目',
-      wixHintPrefix: '預期是以 ',
-      wixHintSuffix: ' 開頭的 Wix 媒體 URI。若你是刻意貼上其他格式，仍可直接儲存。',
+      featuredImageHint: '預期是網站路徑（例如 /imgs/media/photo.webp），或店家 Supabase Storage 中圖片的 https:// 連結（其他網站的圖片會被封鎖）。若你是刻意貼上其他格式，仍可直接儲存。',
     },
     logistics: {
       dayTablistAria: '日期',

@@ -89,6 +89,10 @@ Recorded so a future audit doesn't re-derive it. Each was tested, not assumed.
 
 ### C1 — Wix sync token in public git history *(not pursued)*
 
+> **Moot since 2026-10:** fundiverstw.com no longer runs on Wix, so the webhook
+> this token unlocked is gone, and the sync itself is retired
+> (`20261029100000_retire_wix_sync.sql`).
+
 The token `cec9e630…` appears in at least eight commits of `fundive/fundive`,
 which is public, alongside the endpoint and header needed to use it. Current
 code in both repos is clean — the value is read from `vault.decrypted_secrets`,

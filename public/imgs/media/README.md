@@ -1,14 +1,12 @@
 # Event photo library
 
-Self-hosted event photos (dive/trip/course images). The catalog stores each
-event's original Wix image reference (`wix:image://v1/<id>/<file>#…`) in
-`events.featured_image`; `src/lib/images.ts` (`resolveImageUrl`) turns that ref
-into a path here: `/imgs/media/<slug>.webp`, where `<slug>` is the media-id
-segment with every non-alphanumeric character replaced by `_`. So there is **no
-Wix/CDN dependency at runtime** and nothing extra is needed in the CSP beyond
-`'self'`.
+Self-hosted event photos (dive/trip/course images). An event's
+`events.featured_image` holds the photo's path here, e.g.
+`/imgs/media/<file>.webp`, and `src/lib/images.ts` (`resolveImageUrl`) uses it
+as-is. So there is **no CDN dependency at runtime** and nothing extra is needed
+in the CSP beyond `'self'`.
 
-Drop the matching `.webp` here for any event you want a photo on. An event whose
+Drop a `.webp` here and put its path in the event's featured image field. An event whose
 image is missing (or has no `featured_image`) falls back to a gradient card — it
 does not break.
 
@@ -23,12 +21,10 @@ pulled on every clone and CI run. Stay well under GitHub's limits.
 - **This folder:** keep the total to a soft budget of **~50 MB**. Past that,
   clones/CI slow down and the repo drifts toward GitHub's recommended **1 GB**
   repo ceiling (they *strongly* recommend under 5 GB).
-- Current usage: **~11 MB across 94 files** — plenty of headroom.
+- Current usage: **~12 MB across 101 files** — plenty of headroom.
 
 If you ever need many large/high-res images, don't commit them here — put them in
 object storage (Supabase Storage, Cloudflare R2) and store the URL in
-`featured_image` (http(s) URLs pass through `resolveImageUrl` unchanged), or use
+`featured_image` (https URLs pass through `resolveImageUrl` unchanged; the CSP allows
+`https://*.supabase.co`, so another host also needs adding there), or use
 Git LFS.
-
-To re-harvest optimized copies from a Wix source, see the marketing site's
-`scripts/fetch-wix-images.mjs` (site-fundivers).

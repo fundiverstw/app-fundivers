@@ -12,8 +12,8 @@
 #
 # Run via `make repair-history`, `npm run db:repair-history`, or this file directly.
 # PREREQ: run `make backup-prod` first. Run on a networked machine, project linked.
-# AFTER:  run `make push` to apply the post-baseline migrations (Wix junction
-#         triggers) -- future pushes then work normally.
+# AFTER:  run `make push` to apply the post-baseline migrations
+#         -- future pushes then work normally.
 set -euo pipefail
 
 cd "$(dirname "$0")/.."

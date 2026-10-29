@@ -1630,7 +1630,7 @@ export const ja: Messages = {
         slug: 'スラッグ', slugPh: '公開サイトで使う URL スラッグ',
         locationPicture: 'ロケーション画像（URL）',
         backgroundPicture: '背景画像（URL）',
-        picturePh: 'wix:image://… または https://…',
+        picturePh: '/imgs/media/….webp または https://…',
       },
     },
     terms: {
@@ -2478,7 +2478,8 @@ export const ja: Messages = {
       gearIncluded: '器材込み——申し込み時に器材の選択肢を出さない',
       gearIncludedHint: '料金に器材一式が含まれる場合（オープンウォーター、体験ダイビング）、または誰もスクーバダイビングをしない場合にチェック。ダイバーに器材の質問は表示されず、料金・請求・PDFにも器材費は入りません。',
       gearIncludedSuggestion: 'この種のイベントは通常器材込みです。別途レンタルする場合を除きチェックしてください。',
-      featuredImage: 'メイン画像（Wix URI）',
+      featuredImage: 'メイン画像',
+      featuredImagePh: '/imgs/media/….webp または Supabase Storage の https://…',
       destinations: '目的地',
       noDestinations: '目的地が登録されていません。',
       newDestination: '+ 目的地を追加',
@@ -2513,8 +2514,7 @@ export const ja: Messages = {
       newAddon: '+ 新しいオプション',
       newAddonTitle: '新しいオプション',
       saveAddon: 'オプションを保存',
-      wixHintPrefix: '',
-      wixHintSuffix: ' で始まる Wix メディア URI が必要です。意図的に別の形式を貼り付けた場合は、そのまま保存できます。',
+      featuredImageHint: 'サイト内パス（例: /imgs/media/photo.webp）、またはショップの Supabase Storage にある画像の https:// リンクが必要です（他サイトの画像はブロックされます）。意図的に別の形式を貼り付けた場合は、そのまま保存できます。',
     },
     logistics: {
       dayTablistAria: '日付',

@@ -31,7 +31,7 @@ aspirational.
 | Minor customers | Accepted only via parent-linked accounts (parent-child flow in code). No standalone under-18 accounts. |
 | Insurance | PADI / DAN professional diving-operator coverage |
 | Payments | Bank transfer, credit card, PayPal, cash. Payments tracked in `public.payments`; deposit/balance semantics in `docs/payments.md`. |
-| Domain / brand | FunDivers TW / fundiverstw.com (Wix-hosted marketing site) + the SPA at `app.fundiverstw.com` (Cloudflare-hosted) |
+| Domain / brand | FunDivers TW / fundiverstw.com (marketing site) + the SPA at `app.fundiverstw.com` (both Cloudflare-hosted) |
 
 Items the attorney should confirm directly with the operator and
 that this document cannot answer authoritatively:
@@ -194,7 +194,7 @@ plus subsequent forward migrations (`20260514030000_parent_child_accounts.sql`,
 
 ### 4.2 Public registration (`/register/:id` route)
 
-Single-form path used when arriving from the Wix marketing site or a
+Single-form path used when arriving from the marketing site or a
 deep-link. Submitted form fields populate the profile and create one
 booking atomically via the `create-registration` Supabase Edge
 Function (server-side; uses the service role).
@@ -296,10 +296,9 @@ removes the `profiles` row and dependent bookings/payments.
 | Processor | Role | Region | Data they hold |
 | --- | --- | --- | --- |
 | Supabase | Database, Auth, Storage, Edge Functions | ap-east-1 (Hong Kong) per `.env.local` `SUPABASE_POOLER_HOST` — operator to confirm exact project region | all PII listed above |
-| Cloudflare Workers | SPA hosting, push cron, worker endpoints | global edge | request metadata, no application PII written to logs by current code |
+| Cloudflare Workers | SPA + marketing-site hosting, DNS, push cron, worker endpoints | global edge | request metadata, no application PII written to logs by current code |
 | Gmail (Google Workspace) SMTP | Outbound transactional email | global | recipient address, email body (registration PDF attached) |
 | Web Push (Mozilla / Apple / Google push services) | Notification delivery | global | endpoint URL, encrypted payload |
-| Wix | Marketing site + catalog mirror | global | event titles, prices, room/addon descriptions (no diver PII) |
 
 Cross-border note: data moves from Taiwan (diver) → Supabase
 ap-east-1 (Hong Kong) on every request. The lawyer should advise
@@ -575,7 +574,7 @@ Full audit at `docs/security-audit.md`. Privacy-relevant items:
 | **C1** | Diver could `PATCH role=admin` on own profile via PostgREST | **FIXED 2026-06-02** — `block_self_privileged_profile_change` trigger |
 | **H1** | Parent could promote child to admin via same shape | **FIXED** by same trigger |
 | **C2** | `create-registration` accepted arbitrary `profile_patch` under service-role | **FIXED 2026-06-02** — allowlist sanitizer + handler extraction with unit tests |
-| **C3** | Wix sync webhook token committed in plaintext | **OPEN** — rotation pending operator action |
+| **C3** | Wix sync webhook token committed in plaintext | **CLOSED 2026-10** — the Wix sync is retired; the token no longer reaches anything |
 | **H4** | Service worker caches `*.supabase.co` responses including `/auth/v1/*` | **OPEN** |
 | **H5** | No CSP / X-Frame-Options on the SPA | **OPEN** |
 | **L10** | `agreed_to_terms_at` is client-supplied, not server-stamped | **OPEN** — affects consent non-repudiation |
@@ -594,13 +593,13 @@ and …").
 This brief covers the **app** at `app.fundiverstw.com`. It does
 NOT cover:
 
-- the Wix marketing site at `fundiverstw.com`
+- the marketing site at `fundiverstw.com`
 - in-person paper waivers / liability releases used at the dive shop
 - physical safety procedures, briefings, dive-site selection
 - insurance contracts the operator holds
 - corporate / tax / employment matters
 
-The Wix marketing site has its own terms surface that should be
+The marketing site has its own terms surface that should be
 reviewed in parallel; the two should be consistent (especially the
 sections on data collection at the marketing → app handoff via
 `/register/:id` deep-links).

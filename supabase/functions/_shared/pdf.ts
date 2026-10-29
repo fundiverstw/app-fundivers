@@ -1,7 +1,6 @@
-// Registration-form PDF builder. Ported near-verbatim from the Wix
-// backend file wix-site/backend/sendRegistrationPdf.web.js — layout and
-// colors deliberately match so divers get the same-looking PDF in email
-// whether the booking came through Wix or the PWA.
+// Registration-form PDF builder. Layout and colors match the PDF the shop's
+// original website emailed, so divers get the same-looking registration PDF
+// they always have.
 //
 // Uses jsPDF directly (Deno 2 edge runtime supports `npm:` specifiers).
 
