@@ -17,7 +17,7 @@ dist-ssr
 .env.push
 
 # Catch-all for non-production / non-app material kept locally but out of the
-# repo: Wix site code, competitor research, scratch notes, etc.
+# repo: competitor research, scratch notes, etc.
 ignore/
 
 

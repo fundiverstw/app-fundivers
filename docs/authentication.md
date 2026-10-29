@@ -57,8 +57,8 @@ dive without are collected at booking time by `RegisterForm`.
 
 ### `/register` and `/register/:id` — one-shot signup + booking
 
-Public funnel for visitors arriving from fundiverstw.com or a Wix
-calendar deep-link. `RegisterPage` renders `RegisterForm`. On submit
+Public funnel for visitors arriving from fundiverstw.com (its event
+pages deep-link here). `RegisterPage` renders `RegisterForm`. On submit
 the form invokes the **`create-registration` edge function**, which:
 
 - Guest path (caller has no Bearer JWT): the same Turnstile + per-IP gates,

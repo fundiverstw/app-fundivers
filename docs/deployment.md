@@ -155,8 +155,8 @@ Either the body has `email` + `password` (guest flow → creates the
 account with `email_confirm: true`, bypassing the click-to-confirm
 gate) or the caller's Bearer JWT identifies an authed user. Either
 way, the function then UPDATEs the profile, INSERTs the booking,
-builds a PDF (via `_shared/pdf.ts`, layout ported from the Wix
-backend), and emails it via Gmail SMTP to both `fundiverstw@gmail.com`
+builds a PDF (via `_shared/pdf.ts`, layout carried over from the
+shop's original website), and emails it via Gmail SMTP to both `fundiverstw@gmail.com`
 and the diver. Returns `{ booking_id, session }`; `session` is
 populated only on the guest path so the client can `setSession`
 immediately. If the booking insert fails on the guest path the

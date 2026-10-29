@@ -94,7 +94,7 @@ const CoralPage = lazy(() =>
 )
 
 // Public registration flow — /register (pick an event) and /register/:id
-// (deep-link from Wix calendar) both render RegisterPage. Outside ProtectedRoute
+// (deep-link from the public site's event pages) both render RegisterPage. Outside ProtectedRoute
 // so cold visitors don't hit an auth wall; lazy-loaded so the cold path doesn't
 // pay for the full PWA bundle.
 const RegisterPage = lazy(() =>

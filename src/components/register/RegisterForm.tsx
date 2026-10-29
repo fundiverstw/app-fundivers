@@ -658,7 +658,7 @@ function RegisterFormBodyInner({ event, profile, userId, onSubmitSuccess, onCanc
 
   // Profile fields — pre-filled from the diver's profile (empty strings for
   // missing values so the inputs are controlled). On submit we UPSERT any
-  // changes back to profiles so a Wix visitor who fills these in the first
+  // changes back to profiles so a first-time visitor who fills these in the first
   // time has them pre-filled for every future registration.
   const [fullName, setFullName]  = useState(profile?.name  ?? '')
   const [dob, setDob]            = useState(profile?.date_of_birth ?? '')

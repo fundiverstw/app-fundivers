@@ -7,6 +7,10 @@ the same prod database.
 
 ## The three consumers (all read prod)
 
+> Since 2026-10 Wix is retired: fundiverstw.com is the Cloudflare-hosted
+> site-fundivers, and the Wix sync triggers are dropped
+> (migration `20261029100000_retire_wix_sync`). The Wix rows below are history.
+
 | Consumer | How it reads | Writes? |
 | --- | --- | --- |
 | **app-fundivers** (the React app) | Supabase JS client, `.from('EO_dives')` etc. — ~271 `eo_dive_id`/`eo_course_id` + 77 `EO_dives`/`EO_courses` refs across ~57 files | **yes** (admins create/edit) |

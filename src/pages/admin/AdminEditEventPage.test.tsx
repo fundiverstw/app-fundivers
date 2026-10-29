@@ -122,8 +122,8 @@ describe('AdminEditEventPage', () => {
     expect(await screen.findByText(/waiver requirements/i)).toBeInTheDocument()
   })
 
-  it('prefills the Wix featured image field and round-trips it into the update payload', async () => {
-    // The input round-trips the wix:image:// URI verbatim — no parsing,
+  it('prefills the featured image field and round-trips it into the update payload', async () => {
+    // The input round-trips the stored path verbatim — no parsing,
     // no validation beyond a soft hint we don't assert on here.
     const existing = {
       id: 'dive_x', kind: 'dive',
@@ -138,7 +138,7 @@ describe('AdminEditEventPage', () => {
       gear_rental: null,
       nitrox_required: false,
       dive_days: 1,
-      featured_image: 'wix:image://v1/abc/featured.jpg#originWidth=2000&originHeight=3000',
+      featured_image: '/imgs/media/featured.webp',
       prereqs: null, req_dives: null,
       notes: '',
       cancel_date: null, cancel_policy: null,
@@ -158,16 +158,16 @@ describe('AdminEditEventPage', () => {
     const user = userEvent.setup()
     renderAt('/admin/events/dive_x/edit')
 
-    const featuredInput = await screen.findByLabelText(/featured image \(wix uri\)/i) as HTMLInputElement
+    const featuredInput = await screen.findByLabelText(/featured image/i) as HTMLInputElement
     await waitFor(() => expect(featuredInput.value).toBe(existing.featured_image))
 
     await user.clear(featuredInput)
-    await user.type(featuredInput, 'wix:image://v1/new/hero.jpg')
+    await user.type(featuredInput, 'https://example.com/hero.jpg')
     await user.click(screen.getByRole('button', { name: /save changes/i }))
 
     await waitFor(() => expect(updateSpy).toHaveBeenCalled())
     const payload = (updateSpy.mock.calls[0]?.[0] ?? {}) as Record<string, unknown>
-    expect(payload.featured_image).toBe('wix:image://v1/new/hero.jpg')
+    expect(payload.featured_image).toBe('https://example.com/hero.jpg')
   })
 
   it('renders an error and no form when the dive is not found', async () => {

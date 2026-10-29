@@ -20,6 +20,7 @@ import { newestPerGroup, type PastEventOption } from '../../lib/event-preload'
 import { BTN_XS_GHOST, ERROR_NOTE } from '../../styles/tokens'
 import { keepsDepositOnCancel } from '../../lib/cancellation-policies'
 import { suggestsGearIncluded } from '../../lib/gear'
+import { resolveImageUrl } from '../../lib/images'
 import { discountValueLabel } from '../../lib/discounts'
 import { t } from '../../i18n'
 
@@ -775,7 +776,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
               <Checkbox checked={form.is_trip}         onChange={v => set('is_trip', v)}         label={ef.isTrip} />
               <Checkbox checked={form.is_private}      onChange={v => set('is_private', v)}      label={ef.isPrivate} />
             </div>
-            <WixImageField
+            <ImageField
               label={ef.featuredImage}
               value={form.featured_image}
               onChange={v => set('featured_image', v)}
@@ -960,7 +961,7 @@ export function EventForm({ mode, initial, onSubmit, onCancel, submitLabel, rend
           <Field label={ef.schedule}>
             <Textarea value={form.schedule} onChange={v => set('schedule', v)} />
           </Field>
-          <WixImageField
+          <ImageField
             label={ef.featuredImage}
             value={form.featured_image}
             onChange={v => set('featured_image', v)}
@@ -1249,16 +1250,14 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   )
 }
 
-// Wix media references look like
-//   wix:image://v1/<id>/<filename>#originWidth=…&originHeight=…
-// Wix Velo reads them directly for hero / gallery rendering. We don't
-// resolve or validate beyond a soft prefix hint — admins paste in
-// whatever the Wix Media Manager hands them.
-function WixImageField({
+// Event photos are a site path (/imgs/media/<file>.webp, self-hosted) or an
+// http(s) URL; resolveImageUrl() in src/lib/images.ts displays nothing else.
+// Only a soft hint here — the field still saves whatever is typed.
+function ImageField({
   label, value, onChange,
 }: { label: string; value: string; onChange: (v: string) => void }) {
   const trimmed = value.trim()
-  const looksRight = trimmed === '' || trimmed.startsWith('wix:image://')
+  const looksRight = trimmed === '' || resolveImageUrl(trimmed) !== null
   return (
     <label className="block space-y-1">
       <span className="text-xs font-medium text-white/80">{label}</span>
@@ -1266,13 +1265,11 @@ function WixImageField({
         type="text"
         value={value}
         onChange={e => onChange(e.target.value)}
-        placeholder="wix:image://v1/…/…jpg#originWidth=…&originHeight=…"
+        placeholder={ef.featuredImagePh}
         className={INPUT_CLASS}
       />
       {!looksRight && (
-        <span className="block text-[11px] text-amber-300">
-          {ef.wixHintPrefix}<code>wix:image://</code>{ef.wixHintSuffix}
-        </span>
+        <span className="block text-[11px] text-amber-300">{ef.featuredImageHint}</span>
       )}
     </label>
   )

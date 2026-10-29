@@ -1,4 +1,4 @@
-// Shoe size conversion table ported from the Wix registration form.
+// Shoe size conversion table ported from the original registration form.
 // Rows are parallel size lines; columns are the five supported units.
 // JP is the canonical "body" reference (cm of foot length); everything else
 // is nearest-match across the row.

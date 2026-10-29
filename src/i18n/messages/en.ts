@@ -1650,7 +1650,7 @@ export const en = {
         slug: 'Slug', slugPh: 'URL slug used by the public site',
         locationPicture: 'Location picture (URL)',
         backgroundPicture: 'Background picture (URL)',
-        picturePh: 'wix:image://… or https://…',
+        picturePh: '/imgs/media/….webp or https://…',
       },
     },
     terms: {
@@ -2517,7 +2517,8 @@ export const en = {
       gearIncluded: 'Gear included — no gear options at registration',
       gearIncludedHint: 'Tick when the fee already covers a set (Open Water, Discover Scuba) or nobody scuba dives. Divers are asked no gear question and no gear reaches the price, the invoice or the PDF.',
       gearIncludedSuggestion: 'This usually includes gear. Tick the box unless divers rent separately for it.',
-      featuredImage: 'Featured image (Wix URI)',
+      featuredImage: 'Featured image',
+      featuredImagePh: '/imgs/media/….webp or https://…',
       destinations: 'Destinations',
       noDestinations: 'No destinations defined.',
       newDestination: '+ New destination',
@@ -2552,8 +2553,7 @@ export const en = {
       newAddon: '+ New add-on',
       newAddonTitle: 'New add-on',
       saveAddon: 'Save add-on',
-      wixHintPrefix: 'Expected a Wix media URI starting with ',
-      wixHintSuffix: ". Save anyway if you've pasted a different format on purpose.",
+      featuredImageHint: "Expected a site path starting with / (e.g. /imgs/media/photo.webp) or an https:// link. Save anyway if you've pasted a different format on purpose.",
     },
     logistics: {
       dayTablistAria: 'Day',
