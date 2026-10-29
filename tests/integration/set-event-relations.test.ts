@@ -48,7 +48,7 @@ async function makeAddon(name: string): Promise<string> {
 async function makeDestination(name: string): Promise<string> {
   const id = crypto.randomUUID()
   const { error } = await admin.from('travel_destinations' as never).insert({
-    id: id, admin_title: name, slug: `/test/${id}`, country: 'Testland',
+    id: id, admin_title: name, country: 'Testland',
   } as never)
   if (error) throw error
   destIds.push(id)

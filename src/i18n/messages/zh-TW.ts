@@ -1628,10 +1628,6 @@ export const zhTW: Messages = {
         tagline: '標語', taglinePh: '簡短一句話…',
         diverRequirements: '潛水員條件', diverRequirementsPh: '證照等級、經驗…',
         sortOrder: '排序', sortOrderPh: '數字越小越前面',
-        slug: '網址代稱', slugPh: '公開網站使用的 URL slug',
-        locationPicture: '地點圖片（URL）',
-        backgroundPicture: '背景圖片（URL）',
-        picturePh: '/imgs/media/….webp 或 https://…',
       },
     },
     terms: {

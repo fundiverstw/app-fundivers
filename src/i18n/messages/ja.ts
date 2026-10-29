@@ -1627,10 +1627,6 @@ export const ja: Messages = {
         tagline: 'キャッチコピー', taglinePh: '短い一文…',
         diverRequirements: 'ダイバー要件', diverRequirementsPh: '認定レベル、経験…',
         sortOrder: '並び順', sortOrderPh: '小さいほど先に表示',
-        slug: 'スラッグ', slugPh: '公開サイトで使う URL スラッグ',
-        locationPicture: 'ロケーション画像（URL）',
-        backgroundPicture: '背景画像（URL）',
-        picturePh: '/imgs/media/….webp または https://…',
       },
     },
     terms: {
