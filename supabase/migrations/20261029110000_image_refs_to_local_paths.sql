@@ -13,6 +13,12 @@
 -- at a missing file, which the cards already handle (gradient fallback), the
 -- same as before.
 
+--
+-- A few events instead hold a direct Wix CDN link
+-- (https://static.wixstatic.com/media/<media-id>[/…]). The app's CSP never
+-- allowed that host, so those never displayed; they map to the same local
+-- path, and their copies were added to public/imgs/media alongside this.
+
 create function pg_temp.local_image_path(ref text) returns text
 language sql immutable as $$
   select case
@@ -21,20 +27,40 @@ language sql immutable as $$
         split_part(split_part(regexp_replace(btrim(ref), '^wix:image://v1/', ''), '#', 1), '/', 1),
         '[^a-zA-Z0-9]', '_', 'g'
       ) || '.webp'
+    when btrim(ref) ~ '^https?://static\.wixstatic\.com/media/' then
+      '/imgs/media/' || regexp_replace(
+        split_part(split_part(split_part(
+          regexp_replace(btrim(ref), '^https?://static\.wixstatic\.com/media/', ''),
+          '?', 1), '#', 1), '/', 1),
+        '[^a-zA-Z0-9]', '_', 'g'
+      ) || '.webp'
     else ref
   end
 $$;
 
 update public.events
    set featured_image = pg_temp.local_image_path(featured_image)
- where featured_image like '%wix:image://%';
+ where featured_image like '%wix:image://%'
+    or featured_image like '%static.wixstatic.com/media/%';
 
 update public.travel_destinations
    set location_picture   = pg_temp.local_image_path(location_picture),
        background_picture = pg_temp.local_image_path(background_picture)
- where location_picture like '%wix:image://%'
-    or background_picture like '%wix:image://%';
+ where location_picture   similar to '%(wix:image://|static.wixstatic.com/media/)%'
+    or background_picture similar to '%(wix:image://|static.wixstatic.com/media/)%';
 
-update public.trip_templates
-   set picture = pg_temp.local_image_path(picture)
- where picture like '%wix:image://%';
+-- The baseline gives trip_templates a `picture` column, but production no
+-- longer has it, so only touch it where it exists.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+     where table_schema = 'public' and table_name = 'trip_templates'
+       and column_name = 'picture'
+  ) then
+    update public.trip_templates
+       set picture = pg_temp.local_image_path(picture)
+     where picture like '%wix:image://%';
+  end if;
+end
+$$;

@@ -1251,7 +1251,7 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
 }
 
 // Event photos are a site path (/imgs/media/<file>.webp, self-hosted) or an
-// http(s) URL; resolveImageUrl() in src/lib/images.ts displays nothing else.
+// https URL; resolveImageUrl() in src/lib/images.ts displays nothing else.
 // Only a soft hint here — the field still saves whatever is typed.
 function ImageField({
   label, value, onChange,

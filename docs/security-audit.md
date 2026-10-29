@@ -246,6 +246,9 @@ callers.
 
 ### C3. Wix sync webhook token committed in plaintext, replicated across 9 triggers
 
+> **Moot since 2026-10:** the Wix sync is retired and its triggers and
+> functions dropped (`20261029100000_retire_wix_sync.sql`).
+
 **Status: FIXED 2026-06-03** in
 `supabase/migrations/20260603030000_wix_sync_token_from_vault.sql`.
 Token rotated in Wix Secrets Manager; new value lives in
@@ -982,6 +985,8 @@ Dev seed accounts (`diverdiver`, `adminadmin`, `staffstaff`) are all
 Unify on whatever Supabase project setting enforces.
 
 ### L7. `wix-sync` triggers + `Other_Addons` have inconsistent quoting
+
+> **2026-10:** the `wix_sync_*` triggers no longer exist (Wix sync retired).
 
 **Status: DEFERRED 2026-06-03.** Pure-hygiene item; the audit itself
 flags it as non-blocking. Renaming the Bubble-imported tables would

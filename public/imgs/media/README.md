@@ -21,9 +21,10 @@ pulled on every clone and CI run. Stay well under GitHub's limits.
 - **This folder:** keep the total to a soft budget of **~50 MB**. Past that,
   clones/CI slow down and the repo drifts toward GitHub's recommended **1 GB**
   repo ceiling (they *strongly* recommend under 5 GB).
-- Current usage: **~11 MB across 94 files** — plenty of headroom.
+- Current usage: **~12 MB across 101 files** — plenty of headroom.
 
 If you ever need many large/high-res images, don't commit them here — put them in
 object storage (Supabase Storage, Cloudflare R2) and store the URL in
-`featured_image` (http(s) URLs pass through `resolveImageUrl` unchanged), or use
+`featured_image` (https URLs pass through `resolveImageUrl` unchanged; the CSP allows
+`https://*.supabase.co`, so another host also needs adding there), or use
 Git LFS.

@@ -2518,7 +2518,7 @@ export const en = {
       gearIncludedHint: 'Tick when the fee already covers a set (Open Water, Discover Scuba) or nobody scuba dives. Divers are asked no gear question and no gear reaches the price, the invoice or the PDF.',
       gearIncludedSuggestion: 'This usually includes gear. Tick the box unless divers rent separately for it.',
       featuredImage: 'Featured image',
-      featuredImagePh: '/imgs/media/….webp or https://…',
+      featuredImagePh: '/imgs/media/….webp or Supabase Storage https://…',
       destinations: 'Destinations',
       noDestinations: 'No destinations defined.',
       newDestination: '+ New destination',
@@ -2553,7 +2553,7 @@ export const en = {
       newAddon: '+ New add-on',
       newAddonTitle: 'New add-on',
       saveAddon: 'Save add-on',
-      featuredImageHint: "Expected a site path starting with / (e.g. /imgs/media/photo.webp) or an https:// link. Save anyway if you've pasted a different format on purpose.",
+      featuredImageHint: "Expected a site path such as /imgs/media/photo.webp, or an https:// link to an image in the shop's Supabase Storage (images on other sites are blocked). Save anyway if you've pasted a different format on purpose.",
     },
     logistics: {
       dayTablistAria: 'Day',
