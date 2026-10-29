@@ -1902,7 +1902,6 @@ export interface Database {
           id: string
           code: string
           name: string
-          name_zh: string | null
           rank: number
           /** 'PADI' / 'BSAC' / 'CMAS' / 'SSI' / 'NAUI' / 'SAA' / 'SDI' / 'TDI'. */
           organization: string
@@ -1916,7 +1915,6 @@ export interface Database {
           id?: string
           code: string
           name: string
-          name_zh?: string | null
           rank: number
           organization: string
           padi_equivalent_id?: string | null
@@ -2648,27 +2646,21 @@ export interface Database {
         Row: {
           id: string
           admin_title: string | null
-          slug: string | null
           tagline: string | null
           country: string | null
           divetype: string | null
           sort_order: number | null
           international: boolean | null
-          location_picture: string | null
-          background_picture: string | null
           diver_requirements: string | null
         }
         Insert: {
           id: string
           admin_title?: string | null
-          slug?: string | null
           tagline?: string | null
           country?: string | null
           divetype?: string | null
           sort_order?: number | null
           international?: boolean | null
-          location_picture?: string | null
-          background_picture?: string | null
           diver_requirements?: string | null
         }
         Update: Partial<Database['public']['Tables']['travel_destinations']['Insert']>

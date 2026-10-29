@@ -1647,10 +1647,6 @@ export const en = {
         tagline: 'Tagline', taglinePh: 'Short one-line hook…',
         diverRequirements: 'Diver requirements', diverRequirementsPh: 'Certification level, experience…',
         sortOrder: 'Sort order', sortOrderPh: 'Lower shows first',
-        slug: 'Slug', slugPh: 'URL slug used by the public site',
-        locationPicture: 'Location picture (URL)',
-        backgroundPicture: 'Background picture (URL)',
-        picturePh: '/imgs/media/….webp or https://…',
       },
     },
     terms: {
