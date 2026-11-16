@@ -3,6 +3,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "fundive": "github:fundive/fundive#f8bd06d0b66f2ddcca06e409a121dd1a0ddcd699"
+    "fundive": "github:fundive/fundive#v0.2.0"
   }
 }
