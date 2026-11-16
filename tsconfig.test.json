@@ -1,8 +1,0 @@
-{
-  "extends": "./tsconfig.app.json",
-  "compilerOptions": {
-    "types": ["vite/client", "vite-plugin-pwa/react", "vitest/globals", "@testing-library/jest-dom"],
-    "noEmit": true
-  },
-  "include": ["src", "tests"]
-}

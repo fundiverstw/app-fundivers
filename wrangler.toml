@@ -1,40 +1,25 @@
+# The SPA worker that serves app.fundiverstw.com. The name and the custom-domain
+# route are what production already runs under; renaming the worker would
+# create a second one and leave the domain bound to the old. `main` points into
+# the platform package; `fundive deploy` builds nothing, so run `fundive build`
+# (or `make deploy`) first.
 name = "app-fundiverstw"
-main = "src/worker.ts"
+main = "node_modules/fundive/src/worker.ts"
 compatibility_date = "2026-04-01"
-
-# Both default to false once `routes` is declared below, which would switch off
-# the workers.dev subdomain and preview URLs that are currently live. Pinned to
-# the Worker's actual state so this file describes what is deployed rather than
-# quietly changing it. (Turning workers.dev off is defensible — it stops the app
-# being served from a second address — but that is a deliberate decision, not a
-# side effect of declaring a route.)
-#
-# These are top-level keys: they must stay ABOVE [[routes]], or TOML reads them
-# as fields of the route itself and wrangler rejects the config.
 workers_dev = true
 preview_urls = true
 
-# The production domain, declared here rather than only in the dashboard. A
-# deploy overwrites the remote config with this file, so a route that lives
-# only in the dashboard is silently unbound the first time anyone deploys —
-# taking app.fundiverstw.com off the Worker.
 [[routes]]
 pattern = "app.fundiverstw.com"
 zone_name = "fundiverstw.com"
 custom_domain = true
-# Mirrors the domain's live state: the route is active, and preview
-# deployments are not served from it (previews stay on their own URLs).
 enabled = true
 previews_enabled = false
 
-# Smart placement — also dashboard-only until now, and dropped by the same
-# overwrite.
 [placement]
 mode = "smart"
 
 [assets]
 directory = "./dist"
 binding = "ASSETS"
-# Serve index.html for unknown paths so client-side routes (e.g. /calendar)
-# don't 404 when the browser re-fetches them on reload.
 not_found_handling = "single-page-application"
