@@ -1,22 +1,16 @@
+# The push-notification cron worker. Keep the name: a worker under any other
+# name is a second worker, and both would run the crons (double reminders,
+# double waitlist offers). Secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+# VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, ADMIN_TRIGGER_SECRET) are already set on
+# the live worker and survive a redeploy.
 name = "fundivers-push"
-main = "src/index.ts"
+main = "../../node_modules/fundive/workers/push/src/index.ts"
 compatibility_date = "2026-04-01"
-# web-push depends on node:crypto / Buffer — Workers supports these under the
-# nodejs_compat flag. No polyfills needed.
 compatibility_flags = ["nodejs_compat"]
 
-# Two crons:
-#   - "0 2 * * *"    — daily reminder fan-out (02:00 UTC = 10:00 Asia/Taipei).
-#   - "*/15 * * * *" — waitlist-offer processing (every 15 min): send pushes
-#                      and emails for new offers, expire stale ones, chain
-#                      expired offers to the next waitlister.
-# Cloudflare cron triggers are always UTC.
 [triggers]
 crons = ["0 2 * * *", "*/15 * * * *"]
 
-# Non-secret env can live here; secrets go via `wrangler secret put …`.
-# See docs/push-notifications.md for the deploy runbook. Both are per-fork:
-# point them at your own contact email and app origin(s) (comma-separated).
 [vars]
 VAPID_SUBJECT = "mailto:fundiverstw@gmail.com"
 ALLOWED_ORIGINS = "https://app.fundiverstw.com"

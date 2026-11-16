@@ -16,6 +16,9 @@ dist-ssr
 .env.local
 .env.push
 
+# The platform's public/ merged with ours at build time.
+node_modules/.cache/
+
 # Catch-all for non-production / non-app material kept locally but out of the
 # repo: competitor research, scratch notes, etc.
 ignore/

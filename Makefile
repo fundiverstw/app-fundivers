@@ -1,160 +1,59 @@
-# The Supabase CLI ships PostHog telemetry, and its shutdown flush can time out
-# and take the CLI's EXIT CODE with it — so a `make deploy` whose functions
-# deployed perfectly still failed with "Timeout while shutting down PostHog"
-# followed by make Error 1. DO_NOT_TRACK is the cross-tool convention
-# (consoledonottrack.com) the CLI honours: no telemetry, no flush, no spurious
-# failure. Set here rather than via `supabase telemetry disable` so it travels
-# with the repo — every fork and CI run gets it, with no per-machine setup.
-export DO_NOT_TRACK := 1
+# FunDivers TW runs the FunDive platform (node_modules/fundive). Every target
+# here is a thin wrapper over the `fundive` CLI; the platform holds the code,
+# the migrations and the edge functions, this repo holds the shop's config,
+# branding and infrastructure names.
+#
+# Env files, as before the move:
+#   .env.local       SUPABASE_* production credentials (db, functions, backups)
+#                    and the local-stack VITE_* values for `make dev`
+#   .env.production  CLOUDFLARE_* credentials and the production VITE_* values;
+#                    a production build reads it automatically
 
-.PHONY: help dev studio mail start stop status reset diff link pull push dump-data backup-prod repair-history verify test test-only security scenario preflight check-edge lint lint-fix typecheck deploy deploy-app deploy-push deploy-functions
+FUNDIVE = npx fundive
+
+.PHONY: help install dev build preview deploy deploy-app deploy-push deploy-functions push adopt backup-prod
 
 help:
-	@echo "Local dev:"
-	@echo "  make dev         — start Vite against the local supabase stack"
-	@echo "  make studio      — open Supabase Studio (DB browser) in your browser"
-	@echo "  make mail        — open Inbucket (local email inbox) in your browser"
-	@echo ""
-	@echo "Supabase stack:"
-	@echo "  make start       — boot local stack"
-	@echo "  make stop        — tear down local stack"
-	@echo "  make status      — print local URLs + keys"
-	@echo "  make reset       — wipe local db and reapply migrations + seed.sql"
-	@echo "  make diff        — show schema drift between local db and migrations"
-	@echo "  make link        — link repo to cloud project"
-	@echo "  make pull        — pull cloud schema into a new migration"
-	@echo "  make push        — push local migrations to cloud"
-	@echo "  make dump-data   — dump cloud data into supabase/seed.sql"
-	@echo "  make backup-prod — snapshot the linked PROD db (schema+data+roles) to backups/ — run on a networked machine, before a risky migration"
-	@echo "  make repair-history — one-time: reconcile the prod migration registry to the squashed baseline (run before the first push after squashing)"
-	@echo "  make verify      — check local is in sync with cloud (schema + row counts)"
-	@echo ""
-	@echo "Testing:"
-	@echo "  make preflight   — run before a push: everything below, incl. the suites CI cannot (they need Docker)"
-	@echo "  make test        — the gate: typecheck + lint + deno check + every local test"
-	@echo "  make test-only   — just the test run, skipping typecheck and lint"
-	@echo "  make scenario    — only the multi-step feature journeys in tests/scenario/"
-	@echo "  make security    — run only the black-box attacker probes in tests/security/"
-	@echo "  make check-edge  — deno check over supabase/functions/ (tsc -b cannot read them)"
-	@echo "  make lint        — run eslint over the SPA + tests"
-	@echo "  make lint-fix    — run eslint with --fix to auto-correct what it can"
-	@echo "  make typecheck   — run tsc --noEmit (no build, just type validation)"
-	@echo ""
-	@echo "Deploy:"
-	@echo "  make deploy            — deploy both workers (SPA + push cron) + edge functions"
-	@echo "  make deploy-app        — deploy just the SPA (app-fundiverstw)"
-	@echo "  make deploy-push       — deploy just the push cron (fundivers-push)"
-	@echo "  make deploy-functions  — deploy all supabase edge functions in supabase/functions/"
+	@echo "make install          install the pinned platform (package.json)"
+	@echo "make dev              dev server against the local Supabase stack"
+	@echo "make build            production build into dist/"
+	@echo "make deploy           SPA + push worker + edge functions"
+	@echo "make deploy-app       just the SPA worker (app-fundiverstw)"
+	@echo "make deploy-push      just the push cron worker (fundivers-push)"
+	@echo "make deploy-functions just the edge functions (sets FUNDIVE_CONFIG)"
+	@echo "make push             apply the platform's new migrations to production"
+	@echo "make adopt            dry run of the one-time registry adoption (docs/cutover.md)"
+	@echo "make backup-prod      dump production roles/schema/data into backups/"
 
-# Guard for anything that reads or writes the LOCAL database.
-#
-# app-fundivers and fundive run their local Supabase stacks on the SAME ports, so
-# only one can be up at a time. A CLI command run from this repo while the other
-# stack is the live one connects happily to the WRONG database: `supabase
-# migration list --local` then reports the other repo's migrations as "remote",
-# which reads exactly like production drift, and the integration suite would
-# assert against the other repo's schema. Both have happened.
-#
-# The container name is project-scoped (supabase_db_<project_id>), so its
-# presence is the one unambiguous check. scripts/verify-sync.sh does the same.
-LOCAL_DB_CONTAINER = supabase_db_app-fundivers
-REQUIRE_LOCAL = \
-	if ! docker ps --format '{{.Names}}' | grep -qx "$(LOCAL_DB_CONTAINER)"; then \
-	  echo "ERROR: this repo's local stack is not running ($(LOCAL_DB_CONTAINER))."; \
-	  echo "       Another project's stack may hold the ports — check: docker ps --format '{{.Names}}'"; \
-	  echo "       Start this one with: make start"; \
-	  exit 1; \
-	fi
+install: ; @npm install
 
-start:      ; @npm run db:start
-stop:       ; @npm run db:stop
-status:     ; @npm run db:status
-reset:
-	@# The CLI's post-reset "Restarting containers..." step often returns 502
-	@# while migrations + seeds did apply cleanly — Kong/PostgREST are still
-	@# pointing at the pre-reset DB. Restart them unconditionally so the
-	@# stack is usable on the next command, then propagate the CLI's exit
-	@# code so genuine migration failures still surface.
-	@npm run db:reset; status=$$?; \
-	  docker restart supabase_rest_app-fundivers supabase_kong_app-fundivers >/dev/null 2>&1 || true; \
-	  exit $$status
-diff:       ; @npm run db:diff
-link:       ; @npm run db:link
-pull:       ; @npm run db:pull
-push:       ; @npm run db:push
-dump-data:  ; @npm run db:dump-data
-backup-prod: ; @npm run db:backup-prod
-repair-history: ; @npm run db:repair-history
-verify:     ; @bash scripts/verify-sync.sh
-test:       typecheck lint check-edge test-only
-test-only:
-	@$(REQUIRE_LOCAL)
-	@npm run test:all
-security:
-	@$(REQUIRE_LOCAL)
-	@npx vitest run --project security
-# Just the multi-step journeys, for when you want to know whether a whole
-# feature still works rather than which rule broke.
-scenario:
-	@$(REQUIRE_LOCAL)
-	@npx vitest run --project scenario
+dev:     ; @$(FUNDIVE) dev
+build:   ; @$(FUNDIVE) build
+preview: ; @$(FUNDIVE) preview
 
-# Run this before `make push` or `make deploy`.
-#
-# `make test` already covers every vitest project, including the three that need
-# the local Supabase stack (integration, scenario, security) and which CI
-# therefore cannot run. This target exists to name that moment: the gate a push
-# is meant to clear.
-preflight: test
-	@echo ""
-	@echo "preflight: tsc + eslint + deno check + unit + integration + scenario + security — all green."
-	@echo "           Safe to push. Remember `make verify` if the cloud schema may have drifted."
-
-lint:       ; @npm run lint
-lint-fix:   ; @npm run lint:fix
-typecheck:  ; @npx tsc -b
-# tsc -b cannot read supabase/functions/ (jsr:/npm:/https: specifiers), so a
-# broken import there only shows up as a 503 on boot after deploy. Deno's own
-# checker is the only thing that reads those files the way the runtime does.
-check-edge: ; @bash scripts/check-edge.sh
-
-# Cloudflare Worker deploys read their creds (CLOUDFLARE_API_TOKEN,
-# CLOUDFLARE_ACCOUNT_ID) and the cloud VITE_* build vars from .env.production,
-# so a deploy is non-interactive and reproducible — no `wrangler login`, no
-# GitHub Actions secrets needed. REQUIRE_CF fails fast with a clear message when
-# those creds are missing; it sources .env.production in its own sub-shell so
-# nothing leaks into the vite build (which loads .env.production itself).
-REQUIRE_CF = if [ ! -f .env.production ]; then echo "ERROR: .env.production not found — see docs/deployment.md"; exit 1; fi; \
+# Cloudflare credentials come from .env.production, sourced into the deploy's
+# own environment so a missing one fails here, before anything is built.
+REQUIRE_CF = if [ ! -f .env.production ]; then echo "ERROR: .env.production not found (see .env.example)"; exit 1; fi; \
 	set -a; . ./.env.production; set +a; \
 	if [ -z "$$CLOUDFLARE_API_TOKEN" ] || [ -z "$$CLOUDFLARE_ACCOUNT_ID" ]; then \
-	  echo "ERROR: set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in .env.production"; \
-	  echo "  Token (Edit Cloudflare Workers template): https://dash.cloudflare.com/profile/api-tokens"; \
-	  exit 1; \
+	  echo "ERROR: set CLOUDFLARE_API_TOKEN and CLOUDFLARE_ACCOUNT_ID in .env.production"; exit 1; \
 	fi
 
 deploy: deploy-app deploy-push deploy-functions
 
 deploy-app:
 	@$(REQUIRE_CF)
-	@npm run build
-	@set -a; . ./.env.production; set +a; npx wrangler deploy
+	@$(FUNDIVE) build
+	@set -a; . ./.env.production; set +a; $(FUNDIVE) deploy
 
 deploy-push:
 	@$(REQUIRE_CF)
-	@if [ ! -d workers/push/node_modules ]; then \
-	  echo "Installing workers/push deps…"; \
-	  (cd workers/push && npm install); \
-	fi
-	@set -a; . ./.env.production; set +a; cd workers/push && npx wrangler deploy
+	@set -a; . ./.env.production; set +a; $(FUNDIVE) deploy push
 
-deploy-functions: ; @npm run functions:deploy
+deploy-functions: ; @$(FUNDIVE) functions deploy
 
-dev:
-	@if ! docker ps --format '{{.Names}}' | grep -q supabase_db_app-fundivers; then \
-	  echo "Local supabase stack not running — starting it first…"; \
-	  npm run db:start; \
-	fi
-	@npm run dev
+push: ; @$(FUNDIVE) db push
 
-studio: ; @command -v xdg-open >/dev/null && xdg-open http://127.0.0.1:64323 || echo "Open http://127.0.0.1:64323"
-mail:   ; @command -v xdg-open >/dev/null && xdg-open http://127.0.0.1:64324 || echo "Open http://127.0.0.1:64324"
+adopt: ; @$(FUNDIVE) db adopt --baseline 20260708090000 --applied-through 20261029120000
+
+backup-prod: ; @bash scripts/backup-prod.sh
