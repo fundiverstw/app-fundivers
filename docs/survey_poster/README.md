@@ -1,14 +1,22 @@
 # Survey poster
 
-Landscape advertisement poster (QR codes: website, LINK, Instagram, survey). Generate a PDF:
+Landscape advertisement poster (QR codes: website, LINK, Instagram, survey).
+`fundivers-poster.pdf` is the last generated copy. You can also open
+`poster.html` in a browser and print it to PDF (or paper) in landscape.
+
+To regenerate the PDF with `generate-pdf.js`, it needs two images in an `imgs/`
+folder at the repository root, `imgs/fd_logo.png` (copy `public/imgs/fd_logo.png`)
+and `imgs/boat_pic.png` (not in the repository), and Puppeteer:
 
 ```bash
-npm run poster-pdf
+npm install --no-save puppeteer
+node docs/survey_poster/generate-pdf.js
 ```
 
-Output: `posters/survey_poster/fundivers-poster.pdf`. You can also open `poster.html` in a browser and print to PDF (or paper) in landscape orientation.
+It writes `docs/survey_poster/fundivers-poster.pdf`.
 
-**Background:** Add a landscape blue underwater/ocean image as `imgs/ocean_bg.jpg` for the poster background. If missing, a blue gradient is used.
+For a photo background, add a landscape ocean image as `imgs/ocean_bg.jpg`;
+without it the poster uses a blue gradient.
 
 **QR corners (replace placeholders in `poster.html`):**
 - **Top-left:** Website — already set to https://www.fundiverstw.com

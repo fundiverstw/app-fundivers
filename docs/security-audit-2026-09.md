@@ -31,6 +31,14 @@ needing a third-party dashboard login.
 **2 High (fundive only), 2 Medium, 5 Low.** Nothing found in app-fundivers
 rises above Low.
 
+> **Correction (2026-11-16):** "fundive only" held for databases built from
+> app-fundivers' migrations, not for FunDivers production. Production kept
+> Supabase's stock default privileges, so H1 and H2 applied there too:
+> `anon` could EXECUTE `normalize_profile_values()`, `purge_stale_pii()` and
+> six other privileged functions. Closed at the cutover to FunDive by fundive
+> migration `20261116130000_lock_down_adopted_grants`, verified on production
+> afterwards (see `docs/cutover.md`).
+
 Both Highs are fixed, in `20260911100000` and `20260911110000`, each with an
 integration test confirmed to fail against the pre-fix database. Everything
 else is open.

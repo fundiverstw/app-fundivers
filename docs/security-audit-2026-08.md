@@ -66,6 +66,13 @@ Recorded so a future audit doesn't re-derive it. Each was tested, not assumed.
 - **No anon EXECUTE on privileged RPCs in app-fundivers**, including
   `purge_stale_pii`. fundive needed a migration for this; the shop deployment
   was already correct, confirmed function by function.
+  **Correction (2026-11-16):** this was checked against databases built from
+  the repo's migrations, not against production. The production project never
+  received the baseline's locked default privileges and kept Supabase's stock
+  ones, so `anon` could EXECUTE `purge_stale_pii`, `normalize_profile_values`
+  and six other privileged functions there. Found during the move to FunDive
+  and closed at the cutover by fundive migration
+  `20261116130000_lock_down_adopted_grants` (see `docs/cutover.md`).
 - **No XSS sinks** (`dangerouslySetInnerHTML`, `innerHTML`, `eval` appear
   nowhere), no secrets in the bundle, and all five `VITE_*` vars are
   public-by-design.
