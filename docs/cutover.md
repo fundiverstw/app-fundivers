@@ -1,5 +1,16 @@
 # Cutover: app-fundivers to FunDive
 
+> **Done 2026-11-16**, following the steps below. The dry run matched this page
+> exactly. Row counts after the push equaled the backup (442 bookings,
+> 225 profiles, 469 payments, 149 events), and anon lost EXECUTE on
+> `purge_stale_pii`. `npx fundive deploy push` failed the first time: the
+> push worker could not resolve `virtual:fundive-config`. fundive v0.2.1 fixed
+> that in the CLI, this repo moved its pin, and the worker then deployed with
+> its secrets intact. The live bundle carries the same public keys as before
+> (push still off) and names v0.2.1. One thing that looks like a failure and is
+> not new: the guest registration page's call to `event_ride_seats` returns 401,
+> because that function was signed-in-only before the cutover too.
+
 FunDivers moves from its own copy of the app to the FunDive platform, keeping
 the production Supabase database, the Cloudflare workers and the domain. Users
 should notice nothing: same URL, same session, same installed PWA, same push
