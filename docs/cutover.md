@@ -56,7 +56,7 @@ Known out-of-band drift on production, harmless and left alone:
 
 ## Before the cutover (any day ahead)
 
-Done already: `package.json` pins fundive at commit `ff991971` (no release tag
+Done already: `package.json` pins fundive at commit `6b6a2864` (no release tag
 yet; switch to a tag once one is cut), and the old code is tagged
 `app-fundivers-final` for rollback.
 
@@ -122,10 +122,10 @@ runtime.
 
 ## After the cutover
 
-- **Event photos into Supabase Storage** (proposed): 139 events point at
-  `/imgs/media/*.webp`, which this repo ships in `public/`. Uploading them to
-  a public bucket and rewriting `events.featured_image` would make photos
-  admin-managed and drop them from this repo. That is a production data change
-  of its own, so it gets its own step and its own check.
+- **Event photos** live in `public/imgs/media/`, trimmed to the ones upcoming
+  events use. Photos appear only on the dashboard's Featured Trips cards, which
+  list upcoming featured events, so an older event whose file is gone shows
+  nothing anywhere (the admin form shows the path as text). A new photo goes in
+  `public/imgs/media/` and ships with `make deploy-app`.
 - **Upgrading** is editing the tag in `package.json`, `npm install`, then
   `make push` and `make deploy`.

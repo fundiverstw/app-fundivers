@@ -8,7 +8,7 @@ this repository holds only what makes it FunDivers':
 | Path | What |
 | --- | --- |
 | `fundive.config.ts` | shop identity, URLs, locale, dark design, gear and prices, boat manifest |
-| `public/` | logo, icons, favicon and the event photos, laid over the platform's |
+| `public/` | logo, icons, favicon and the photos upcoming events use, laid over the platform's |
 | `wrangler.toml`, `workers/push/wrangler.toml` | the production worker names, domain, vars and crons |
 | `docs/` | shop documents: the cutover runbook, legal brief, security audits, paper registration form, survey poster |
 | `scripts/backup-prod.sh` | logical backup of the production database |
