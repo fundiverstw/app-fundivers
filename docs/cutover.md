@@ -5,9 +5,12 @@ the production Supabase database, the Cloudflare workers and the domain. Users
 should notice nothing: same URL, same session, same installed PWA, same push
 subscriptions, same look.
 
-This repository becomes the shop's **deployment**: config, branding, worker
-names and shop documents. The code, the migrations and the edge functions come
-from `fundive`, pinned in `package.json`.
+This repository becomes the shop's **deployment repository**, set up exactly as
+FunDive's [self-hosting walkthrough](https://fundive.github.io/fundive/self-hosting)
+tells any shop to: what `npx fundive init` creates, with FunDivers' values in
+it. The code, the migrations and the edge functions come from `fundive`,
+pinned in `package.json`; every command below is a documented `npx fundive`
+command ([deployment.md](https://fundive.github.io/fundive/deployment)).
 
 ## What stays the same
 
@@ -16,6 +19,7 @@ from `fundive`, pinned in `package.json`.
 | Supabase project, data, auth users, storage | prod | the same project, untouched |
 | SPA worker | `app-fundiverstw` on app.fundiverstw.com | the same worker, redeployed |
 | Push worker | `fundivers-push`, crons, VAPID keys | the same worker; secrets are not touched |
+| Push notifications in the app | off: the live bundle carries no VAPID key | still off: `.env.local` leaves `VITE_VAPID_PUBLIC_KEY` empty |
 | Edge functions | the same 19 functions | the same names, redeployed |
 | Service worker, cache keys, localStorage keys | | byte-identical in both codebases, so nobody is logged out or loses offline data |
 
@@ -42,7 +46,8 @@ Three things, all rehearsed on a copy of production's registry and grants:
    rows). This migration revokes all of that and sets the default privileges a
    fresh install has. Until the cutover, the hole stays open; to close it
    sooner, run that one file against production in the SQL editor. It is
-   idempotent, so the cutover's `make push` then runs it again harmlessly.
+   idempotent, so the cutover's `npx fundive db push` then runs it again
+   harmlessly.
 
 Rehearsal result: after adopt + push, the adopted database matched a fresh
 fundive install object for object (columns, constraints, indexes, policies,
@@ -56,27 +61,35 @@ Known out-of-band drift on production, harmless and left alone:
 
 ## Before the cutover (any day ahead)
 
-Done already: `package.json` pins fundive at commit `6b6a2864` (no release tag
-yet; switch to a tag once one is cut), and the old code is tagged
-`app-fundivers-final` for rollback.
+Done already: `package.json` pins fundive at commit `f8bd06d0` (no release tag
+yet; switch to a tag once one is cut); the old code is tagged
+`app-fundivers-final` for rollback; and the old `.env.local` and
+`.env.production` were merged into the one `.env.local` the docs describe
+(originals kept in `ignore/env-before-single-file-2026-11-16/`). The merge
+takes each `VITE_*` value from where the old production build took it, and a
+build from it bakes in the same Supabase URL, anon key, Turnstile site key and
+push-worker URL as the live bundle.
 
-1. **Install:** `make install` in this checkout. The old app's `node_modules`
-   can go first (`rm -rf node_modules`).
-2. **Copy the env files** from the old checkout: `.env.local` and
-   `.env.production` work unchanged (see `.env.example`).
-3. **Build and look:** `make build && make preview`, sign in, click through
-   the dashboard, calendar, a registration, an admin event and logistics.
+1. **Install:** `npm install`.
+2. **Build and look:** `npx fundive build && npx fundive preview`, sign in,
+   click through the dashboard, calendar, a registration, an admin event and
+   logistics.
+3. **(Optional) GitHub buttons:** to deploy from the Actions tab instead of this
+   machine, add the repository secrets listed in
+   [deployment.md § GitHub Actions](https://fundive.github.io/fundive/deployment#github-actions).
 
-Optional but cheap: rehearse steps 2 to 4 of the cutover against a restored backup
-(`make backup-prod`, restore into a scratch Postgres, set `SUPABASE_DB_URL` to
-it, run `npx fundive db adopt … --apply` and `npx fundive db push`).
+Optional but cheap: rehearse steps 2 to 4 of the cutover against a restored
+backup (`npx fundive db backup`, restore into a scratch Postgres, set
+`SUPABASE_DB_URL` to it, run `npx fundive db adopt … --apply` and
+`npx fundive db push`).
 
 ## The cutover (one sitting, about 15 minutes)
 
-Run from this repository, on the merged `main`.
+Run from this repository, on `main`.
 
-1. `make backup-prod`: a rollback point for the registry.
-2. `make adopt`: a dry run. Expect:
+1. `npx fundive db backup`: a rollback point for the registry.
+2. `npx fundive db adopt --baseline 20260708090000 --applied-through 20261029120000`:
+   a dry run (checked against production on 2026-11-16). Expect:
    - remote-only, to be marked reverted: 27 versions, from `20260707230000`
      to `20261029100000`
    - local-only, to be marked applied: `20260708090000` plus 16 more, ending at
@@ -85,20 +98,24 @@ Run from this repository, on the merged `main`.
 
    Anything else means production moved since this was written. Stop and
    diff before going on.
-3. `npx fundive db adopt --baseline 20260708090000 --applied-through 20261029120000 --apply`
-4. `make push`: applies the three migrations above. Then check the grants
-   took (read-only), expecting `false`:
+3. The same command with `--apply`.
+4. `npx fundive db push`: applies the three migrations above. Then check the
+   grants took (read-only), expecting `false`:
 
    ```sql
    select has_function_privilege('anon', 'public.purge_stale_pii(integer)', 'execute');
    ```
-5. `make deploy-functions`: sets the `FUNDIVE_CONFIG` secret from
+5. `npx fundive functions deploy`: sets the `FUNDIVE_CONFIG` secret from
    `fundive.config.ts`, then deploys every function. Always deploy functions
-   this way. Without the secret they fall back to the platform's placeholder
+   this way; without the secret they fall back to the platform's placeholder
    shop name and currency.
-6. `make deploy-push`
-7. `make deploy-app`. Open browsers get the usual "update available" banner,
-   the same as for any deploy.
+6. `npx fundive deploy push`
+7. `npx fundive build && npx fundive deploy`. Open browsers get the usual
+   "update available" banner, the same as for any deploy.
+
+Steps 5 to 7 are also the **Deploy** workflow (target `all`) once the
+repository secrets are set; steps 3 and 4 are not in a workflow, and should be
+run by hand, watching the output.
 
 ## Smoke test (5 minutes)
 
@@ -115,10 +132,12 @@ Run from this repository, on the merged `main`.
 ## Rollback
 
 The database stays compatible with the old code: adoption only rewrote the
-registry, and the two migrations changed nothing. To go back, check out the
+registry, the two no-op migrations changed nothing, and the grant lockdown only
+removes access the old app never used. To go back, check out the
 `app-fundivers-final` tag and run its `make deploy-app deploy-push
-deploy-functions`. Leave the registry as fundive's; nothing reads it at
-runtime.
+deploy-functions` (that checkout needs the original env files from
+`ignore/env-before-single-file-2026-11-16/`). Leave the registry as fundive's;
+nothing reads it at runtime.
 
 ## After the cutover
 
@@ -126,6 +145,12 @@ runtime.
   events use. Photos appear only on the dashboard's Featured Trips cards, which
   list upcoming featured events, so an older event whose file is gone shows
   nothing anywhere (the admin form shows the path as text). A new photo goes in
-  `public/imgs/media/` and ships with `make deploy-app`.
-- **Upgrading** is editing the tag in `package.json`, `npm install`, then
-  `make push` and `make deploy`.
+  `public/imgs/media/` and ships with the next app deploy.
+- **Push notifications** are off in production today, and stay off. Turning
+  them on is its own decision: set `VITE_VAPID_PUBLIC_KEY` in `.env.local` to
+  the push worker's own public key (the one in
+  `ignore/env-before-single-file-2026-11-16/.env.push`; the old `.env.local`
+  held a different key that would not have worked), then build and deploy.
+- **Upgrading** follows
+  [deployment.md § Upgrading](https://fundive.github.io/fundive/deployment#upgrading):
+  move the pin, `npm install`, `npx fundive db push`, deploy.

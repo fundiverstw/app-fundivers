@@ -1,14 +1,12 @@
-# The SPA worker that serves app.fundiverstw.com. The name and the custom-domain
-# route are what production already runs under; renaming the worker would
-# create a second one and leave the domain bound to the old. `main` points into
-# the platform package; `fundive deploy` builds nothing, so run `fundive build`
-# (or `make deploy`) first.
+# The worker that serves your app. Rename it before the first deploy if you
+# like; once it is live, keep the name (a new name is a second worker).
 name = "app-fundiverstw"
 main = "node_modules/fundive/src/worker.ts"
 compatibility_date = "2026-04-01"
 workers_dev = true
 preview_urls = true
 
+# Your own domain, once you have one on Cloudflare:
 [[routes]]
 pattern = "app.fundiverstw.com"
 zone_name = "fundiverstw.com"

@@ -1,8 +1,6 @@
-# The push-notification cron worker. Keep the name: a worker under any other
-# name is a second worker, and both would run the crons (double reminders,
-# double waitlist offers). Secrets (SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
-# VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, ADMIN_TRIGGER_SECRET) are already set on
-# the live worker and survive a redeploy.
+# The push-notification worker: booking reminders, waitlist offers, admin
+# broadcasts. Optional; skip it and the app works without push. Keep the name
+# once it is live: a second push worker would run the crons twice.
 name = "fundivers-push"
 main = "../../node_modules/fundive/workers/push/src/index.ts"
 compatibility_date = "2026-04-01"

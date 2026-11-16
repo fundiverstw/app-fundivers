@@ -1,0 +1,54 @@
+# Manual migration push: Actions → "Push migrations" → Run workflow.
+# Applies the database migrations of the FunDive version package.json pins.
+# Dry run by default: it prints which migrations your database has and which
+# it lacks, then what a push would apply, and applies nothing. Untick dry_run
+# to apply. Migrations are forward-only; there is no undo.
+#
+# Repository secrets: SUPABASE_PROJECT_REF, SUPABASE_DB_PASSWORD,
+# SUPABASE_POOLER_HOST.
+name: Push migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: Dry run (list what would be applied, apply nothing)
+        required: false
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-push
+  cancel-in-progress: false
+
+jobs:
+  push:
+    name: Push migrations
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: production
+    env:
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_POOLER_HOST: ${{ secrets.SUPABASE_POOLER_HOST }}
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Migrations (platform vs database)
+        run: npx fundive db verify
+      - name: Push (dry run)
+        if: ${{ inputs.dry_run }}
+        run: npx fundive db push --dry-run
+      - name: Push
+        if: ${{ !inputs.dry_run }}
+        run: npx fundive db push --yes
+      - name: Migrations after the push
+        if: ${{ !inputs.dry_run }}
+        run: npx fundive db verify
