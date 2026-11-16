@@ -7,6 +7,14 @@ cross-border data flows).
 
 **Date:** 2026-06-03.
 
+> **Read as a snapshot of 2026-06-03.** File paths below (`src/…`,
+> `supabase/migrations/…`) refer to this repository as it was on that date;
+> see its git history from then. Since 2026-11-16 the app's code lives in the
+> open-source FunDive platform (https://github.com/fundive/fundive) and this
+> repository holds only FunDivers' configuration. The Terms of Use are no
+> longer a source file either: an admin writes and versions them in the app
+> (Manage → Terms of Use), and the current text is the one shown at `/terms`.
+
 **Status:** the live terms text is at `src/pages/TermsPage.tsx`
 (reproduced verbatim in § 8 below). The app is in pre-production
 hardening — security audit findings are tracked in
