@@ -1,14 +1,8 @@
 {
   "name": "fundiverstw",
   "private": true,
-  "license": "AGPL-3.0-or-later",
   "type": "module",
-  "scripts": {
-    "dev": "fundive dev",
-    "build": "fundive build",
-    "preview": "fundive preview"
-  },
   "dependencies": {
-    "fundive": "github:fundive/fundive#6b6a286403264b6df842103b4d14c2846f6157b2"
+    "fundive": "github:fundive/fundive#f8bd06d0b66f2ddcca06e409a121dd1a0ddcd699"
   }
 }
