@@ -61,8 +61,8 @@ Known out-of-band drift on production, harmless and left alone:
 
 ## Before the cutover (any day ahead)
 
-Done already: `package.json` pins fundive at commit `f8bd06d0` (no release tag
-yet; switch to a tag once one is cut); the old code is tagged
+Done already: `package.json` pins fundive at the `v0.2.0` release tag; the old
+code is tagged
 `app-fundivers-final` for rollback; and the old `.env.local` and
 `.env.production` were merged into the one `.env.local` the docs describe
 (originals kept in `ignore/env-before-single-file-2026-11-16/`). The merge
